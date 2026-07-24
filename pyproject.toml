@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "counterguard"
+version = "0.1.0"
+description = "Autonomous Counterfeit & Grey-Market Intelligence Network"
+authors = ["CounterGuard Team"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "C90"]
+ignore = []
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+testpaths = [
+    "backend/tests",
+]

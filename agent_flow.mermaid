@@ -1,0 +1,33 @@
+sequenceDiagram
+    participant Scout
+    participant Visual as Visual Forensics
+    participant Text as Text Consistency
+    participant Graph as Seller Network
+    participant Price as Price Anomaly
+    participant MS as Mystery Shopper
+    participant Fusion as Confidence Fusion
+    participant Legal as Legal Escalation
+    participant Human as Human Reviewer
+
+    Scout->>Scout: Discover listing
+    Scout->>Visual: Handoff
+    Visual->>Visual: Packaging mismatch found (+15%)
+    Visual->>Text: Handoff
+    Text->>Text: Spec check (consistent, +0%)
+    Text->>Graph: Handoff
+    Graph->>Graph: Linked to 12 known counterfeit sellers (+20%)
+    Graph->>Visual: Compare logos across these 3 related sellers?
+    Visual-->>Graph: 92% similarity
+    Graph->>Graph: Network confirmed (+10%)
+    Graph->>Price: Handoff
+    Price->>Price: 61% below median, no return policy (+8%)
+    Price->>MS: Handoff
+    MS->>MS: Requests invoice from seller
+    MS->>MS: Seller evasive (+18%)
+    MS->>Price: If invoice existed, still suspicious?
+    Price-->>MS: No — invoice would resolve the flag
+    MS->>Fusion: Handoff
+    Fusion->>Fusion: Confidence 71% -> likely_counterfeit
+    Fusion->>Legal: Escalate
+    Legal->>Legal: Draft takedown notice
+    Legal->>Human: Route for approval (NOT auto-filed)

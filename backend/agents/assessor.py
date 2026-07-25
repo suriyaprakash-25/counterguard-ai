@@ -1,3 +1,4 @@
+from backend.constants import RiskLevels, RiskScoreThresholds, RiskWeights
 from backend.schemas.investigation import AnalyzerResult, EvidenceResult, RiskAssessment
 
 
@@ -6,39 +7,40 @@ class RiskAssessor:
         self, analysis: AnalyzerResult, evidence: EvidenceResult
     ) -> RiskAssessment:
         """
-        Computes risk score using deterministic rules based on analysis and evidence.
+        Computes risk score using deterministic rules based on analysis and structured evidence.
         """
         risk_score = 0
+        se = evidence.structured_evidence
 
         # Rule: Very low price
-        if evidence.price_anomaly:
-            risk_score += 40
+        if "price" in se and se["price"]["status"] == "Suspicious":
+            risk_score += RiskWeights.VERY_LOW_PRICE
 
-        # Rule: Seller rating below 3
-        if analysis.seller_rating < 3:
-            risk_score += 25
+        # Rule: Poor seller rating / missing seller
+        if "seller" in se and se["seller"]["status"] in ["Poor", "Missing"]:
+            risk_score += RiskWeights.POOR_SELLER
 
         # Rule: Missing warranty
-        if evidence.missing_warranty:
-            risk_score += 10
+        if "warranty" in se and se["warranty"]["status"] == "Missing":
+            risk_score += RiskWeights.MISSING_WARRANTY
 
         # Rule: Poor listing quality
-        if evidence.listing_quality == "poor":
-            risk_score += 10
+        if "images" in se and se["images"]["status"] == "Poor":
+            risk_score += RiskWeights.POOR_LISTING_QUALITY
 
         # Rule: Suspicious brand formatting
-        if analysis.brand == "GenericBrand":
-            risk_score += 15
+        if analysis.brand == "Unknown" or analysis.brand == "GenericBrand":
+            risk_score += RiskWeights.SUSPICIOUS_BRAND
 
         # Cap score at 100
         risk_score = min(risk_score, 100)
 
         # Determine risk level
-        if risk_score <= 30:
-            risk_level = "LOW"
-        elif risk_score <= 60:
-            risk_level = "MEDIUM"
+        if risk_score <= RiskScoreThresholds.LOW_MAX:
+            risk_level = RiskLevels.LOW
+        elif risk_score <= RiskScoreThresholds.MEDIUM_MAX:
+            risk_level = RiskLevels.MEDIUM
         else:
-            risk_level = "HIGH"
+            risk_level = RiskLevels.HIGH
 
         return RiskAssessment(risk_score=risk_score, risk_level=risk_level)

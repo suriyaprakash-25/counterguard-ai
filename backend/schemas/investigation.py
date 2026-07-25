@@ -18,11 +18,7 @@ class AnalyzerResult(BaseModel):
 
 
 class EvidenceResult(BaseModel):
-    price_anomaly: bool
-    seller_reputation: str
-    listing_quality: str
-    missing_warranty: bool
-    additional_evidence: Dict[str, Any] = Field(default_factory=dict)
+    structured_evidence: Dict[str, Dict[str, str]] = Field(default_factory=dict)
 
 
 class RiskAssessment(BaseModel):
@@ -32,7 +28,14 @@ class RiskAssessment(BaseModel):
 
 class InvestigationReport(BaseModel):
     summary: str
+    product: str
+    marketplace: str
+    seller: str
+    price: float
     risk_score: int
     risk_level: str
+    evidence_summary: Dict[str, Any]
     findings: List[str]
     recommendation: str
+    confidence: float
+    investigation_timestamp: str

@@ -12,7 +12,14 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="CounterGuard API",
-    description="Backend API for CounterGuard autonomous agent network.",
+    description="""
+    Backend API for CounterGuard autonomous agent network.
+
+    ## Features
+    * **Autonomous Scraping:** Uses custom PageFetcher and ParserFactory to intelligently scrape data from Amazon, Flipkart, eBay, etc.
+    * **Multi-Agent Engine:** Analyzes products using AI agents (Analyzer, Collector, Assessor, Reporter).
+    * **Risk Assessment:** Returns comprehensive, deterministic risk levels and JSON structured evidence.
+    """,
     version="1.0.0",
 )
 

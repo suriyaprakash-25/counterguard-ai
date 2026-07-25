@@ -1,17 +1,65 @@
+from backend.constants import Thresholds
 from backend.schemas.investigation import AnalyzerResult, InvestigationRequest
+from backend.schemas.scraping import ScrapingResult
 
 
 class AnalyzerAgent:
-    def analyze(self, request: InvestigationRequest) -> AnalyzerResult:
+    def analyze(
+        self, request: InvestigationRequest, scraping_result: ScrapingResult
+    ) -> AnalyzerResult:
         """
         Normalizes input, extracts structured information, and identifies obvious warning signals.
         """
-        # Mocking extraction logic based on the request URL/marketplace
+        listing = scraping_result.listing
+
+        risk_signals = self._evaluate_risk_signals(listing)
+
         return AnalyzerResult(
-            brand="GenericBrand",
-            title=f"Suspicious Product from {request.marketplace}",
-            price=45.0,
-            seller_rating=2.5,
-            marketplace=request.marketplace,
-            risk_signals=["low_price", "poor_seller_rating"],
+            brand=listing.brand or "Unknown",
+            title=listing.title or f"Product from {request.marketplace}",
+            price=listing.price or 0.0,
+            seller_rating=listing.seller_rating or 0.0,
+            marketplace=listing.marketplace or request.marketplace,
+            risk_signals=risk_signals,
         )
+
+    def _evaluate_risk_signals(self, listing) -> list[str]:
+        risk_signals = []
+        if listing.price is not None and listing.price < Thresholds.PRICE_MIN:
+            risk_signals.append("very_low_price")
+        if (
+            listing.seller_rating is not None
+            and listing.seller_rating < Thresholds.SELLER_RATING_MIN
+        ):
+            risk_signals.append("poor_seller_rating")
+        if not listing.seller_name or listing.seller_name == "Unknown Seller":
+            risk_signals.append("missing_seller")
+        if not listing.warranty_info:
+            risk_signals.append("no_warranty")
+        if not listing.brand:
+            risk_signals.append("unknown_brand")
+        if listing.images_count < Thresholds.MIN_IMAGES:
+            risk_signals.append("few_images")
+
+        self._evaluate_nlp_signals(listing, risk_signals)
+
+        if not listing.marketplace or listing.marketplace == "unknown":
+            risk_signals.append("unknown_marketplace")
+
+        return risk_signals
+
+    def _evaluate_nlp_signals(self, listing, risk_signals: list[str]) -> None:
+        if listing.title and listing.title.isupper():
+            risk_signals.append("all_caps_title")
+
+        if listing.description:
+            if len(listing.description) < Thresholds.MIN_DESCRIPTION_LENGTH:
+                risk_signals.append("short_description")
+            words = listing.description.split()
+            if (
+                len(words) > Thresholds.KEYWORD_STUFFING_MIN_WORDS
+                and len(set(words)) / len(words) < Thresholds.KEYWORD_STUFFING_RATIO
+            ):
+                risk_signals.append("keyword_stuffing")
+        else:
+            risk_signals.append("missing_description")

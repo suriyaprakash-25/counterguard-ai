@@ -31,3 +31,27 @@ class InvestigationExecutionError(CounterGuardError):
     """Raised when the investigation engine fails to execute."""
 
     pass
+
+
+class ScrapingTimeoutError(CounterGuardError):
+    """Raised when fetching a listing times out."""
+
+    pass
+
+
+class ScrapingConnectionError(CounterGuardError):
+    """Raised when failing to connect to a listing."""
+
+    pass
+
+
+class MarketplaceNotSupportedError(CounterGuardError):
+    """Raised when attempting to scrape an unsupported marketplace."""
+
+    pass
+
+
+class ParsingError(CounterGuardError):
+    """Raised when the parser fails to extract data."""
+
+    pass

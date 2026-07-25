@@ -1,3 +1,5 @@
+from typing import List
+
 from langgraph.graph import END, StateGraph
 
 from backend.agents.analyzer import AnalyzerAgent
@@ -14,7 +16,7 @@ from backend.state import InvestigationState
 def build_graph() -> StateGraph:  # noqa: C901
     """
     Builds and returns the LangGraph StateGraph for multi-agent collaborative investigation.
-    Implements dynamic routing based on the PlanningAgent's output.
+    Implements parallel dynamic routing based on the PlanningAgent's output.
     """
     graph = StateGraph(InvestigationState)
 
@@ -59,71 +61,47 @@ def build_graph() -> StateGraph:  # noqa: C901
             )
         }
 
-    # -- Node Wrappers for Dynamic Routing (State Tracking) --
-    def node_planner(state: InvestigationState):
-        new_state = planner_agent.run(state)
-        # Initialize execution tracking based on the plan
-        plan = new_state.get("planning_result")
+    # -- Parallel Routing Function --
+    def route_to_specialists(state: InvestigationState) -> List[str]:
+        """
+        Dynamically routes the graph to all requested specialists concurrently.
+        Returns a list of node names to execute in parallel.
+        """
+        plan = state.get("planning_result")
         if plan and plan.selected_specialists:
             selected = plan.selected_specialists
         else:
-            # Fallback if plan is somehow invalid
+            # Fallback if plan is somehow invalid or missing
             selected = ["PriceAgent", "SellerAgent", "BrandAgent", "ReviewAgent"]
 
-        new_state["remaining_specialists"] = list(selected)
-        new_state["completed_specialists"] = []
-        return new_state
-
-    def make_specialist_node(agent_func, agent_name):
-        def wrapper(state: InvestigationState):
-            new_state = agent_func(state)
-
-            rem = list(new_state.get("remaining_specialists", []))
-            if agent_name in rem:
-                rem.remove(agent_name)
-            new_state["remaining_specialists"] = rem
-
-            comp = list(new_state.get("completed_specialists", []))
-            comp.append(agent_name)
-            new_state["completed_specialists"] = comp
-
-            return new_state
-
-        return wrapper
-
-    # -- Routing Function --
-    def route_next_specialist(state: InvestigationState) -> str:
-        """
-        Dynamically routes the graph to the next requested specialist,
-        or to the coordinator if all requested specialists are complete.
-        """
-        rem = state.get("remaining_specialists", [])
-        if not rem:
-            return "coordinator"
-
-        next_agent = rem[0]
         node_map = {
             "PriceAgent": "price_agent",
             "SellerAgent": "seller_agent",
             "BrandAgent": "brand_agent",
             "ReviewAgent": "review_agent",
         }
-        return node_map.get(next_agent, "coordinator")
+
+        destinations = [node_map[s] for s in selected if s in node_map]
+
+        # If no specialists are selected, bypass straight to the coordinator
+        if not destinations:
+            return ["coordinator"]
+
+        return destinations
 
     # Add Nodes
     graph.add_node("scraper", node_scrape)
     graph.add_node("analyzer", node_analyze)
     graph.add_node("collector", node_evidence)
     graph.add_node("assessor", node_risk)
-    graph.add_node("planner", node_planner)
-    graph.add_node("price_agent", make_specialist_node(price_agent.run, "PriceAgent"))
-    graph.add_node(
-        "seller_agent", make_specialist_node(seller_agent.run, "SellerAgent")
-    )
-    graph.add_node("brand_agent", make_specialist_node(brand_agent.run, "BrandAgent"))
-    graph.add_node(
-        "review_agent", make_specialist_node(review_agent.run, "ReviewAgent")
-    )
+    graph.add_node("planner", planner_agent.run)
+
+    # Directly add specialists without state-tracking wrappers
+    graph.add_node("price_agent", price_agent.run)
+    graph.add_node("seller_agent", seller_agent.run)
+    graph.add_node("brand_agent", brand_agent.run)
+    graph.add_node("review_agent", review_agent.run)
+
     graph.add_node("coordinator", coordinator_agent.run)
     graph.add_node("reporter", node_report)
 
@@ -134,12 +112,16 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_edge("collector", "assessor")
     graph.add_edge("assessor", "planner")
 
-    # Dynamic Routing
-    graph.add_conditional_edges("planner", route_next_specialist)
-    graph.add_conditional_edges("price_agent", route_next_specialist)
-    graph.add_conditional_edges("seller_agent", route_next_specialist)
-    graph.add_conditional_edges("brand_agent", route_next_specialist)
-    graph.add_conditional_edges("review_agent", route_next_specialist)
+    # Dynamic Parallel Routing (Fan-Out)
+    graph.add_conditional_edges("planner", route_to_specialists)
+
+    # Synchronization (Fan-In)
+    # LangGraph will run these agents concurrently. Once all activated edges complete,
+    # the destination node ("coordinator") is queued and executes exactly once.
+    graph.add_edge("price_agent", "coordinator")
+    graph.add_edge("seller_agent", "coordinator")
+    graph.add_edge("brand_agent", "coordinator")
+    graph.add_edge("review_agent", "coordinator")
 
     # Finish Investigation
     graph.add_edge("coordinator", "reporter")

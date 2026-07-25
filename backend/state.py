@@ -32,8 +32,6 @@ class InvestigationState(TypedDict, total=False):
 
     # AI Planning
     planning_result: PlanningResult
-    remaining_specialists: list[str]
-    completed_specialists: list[str]
 
     # Specialist outputs
     price_analysis: PriceAnalysisResult

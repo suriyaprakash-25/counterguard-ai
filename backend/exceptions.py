@@ -1,4 +1,5 @@
 """
+''"""
 Custom exception classes for the CounterGuard backend.
 """
 

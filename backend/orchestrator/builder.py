@@ -23,4 +23,7 @@ def build_graph() -> StateGraph:
     graph.set_entry_point("scout")
     graph.add_edge("scout", END)
     
+    """
+    graph = StateGraph(InvestigationState)
+    # Placeholder for graph wiring
     return graph

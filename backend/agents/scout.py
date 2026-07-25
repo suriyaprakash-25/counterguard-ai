@@ -11,6 +11,7 @@ class ScoutAgent(BaseAgent):
     """
     Scout agent pipeline stage.
     Detects new or changed listings.
+        Detects new or changed listings.
     """
 
     def run(self, state: InvestigationState) -> InvestigationState:

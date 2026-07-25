@@ -38,4 +38,6 @@ class InvestigationReport(BaseModel):
     findings: List[str]
     recommendation: str
     confidence: float
+    ai_summary: str = Field(default="")
+    ai_reasoning: str = Field(default="")
     investigation_timestamp: str

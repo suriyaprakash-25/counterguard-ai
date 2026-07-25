@@ -25,7 +25,7 @@ class BaseSpecialistAgent:
         self.system_prompt = ""
         self.response_model = None
 
-    def run(self, state: InvestigationState) -> InvestigationState:
+    def run(self, state: InvestigationState) -> dict:
         logger.info(f"Running {self.__class__.__name__}")
 
         listing_data = (
@@ -45,14 +45,12 @@ class BaseSpecialistAgent:
                 user_prompt=user_prompt,
                 response_model=self.response_model,
             )
-            self._update_state(state, result)
+            return self._update_state(state, result)
         except LLMServiceError as e:
             logger.error(f"{self.__class__.__name__} failed: {e}")
-            self._update_state(state, self._get_fallback())
+            return self._update_state(state, self._get_fallback())
 
-        return state
-
-    def _update_state(self, state: InvestigationState, result):
+    def _update_state(self, state: InvestigationState, result) -> dict:
         raise NotImplementedError
 
     def _get_fallback(self):
@@ -65,8 +63,10 @@ class PriceAgent(BaseSpecialistAgent):
         self.system_prompt = PRICE_SYSTEM_PROMPT
         self.response_model = PriceAnalysisResult
 
-    def _update_state(self, state: InvestigationState, result: PriceAnalysisResult):
-        state["price_analysis"] = result
+    def _update_state(
+        self, state: InvestigationState, result: PriceAnalysisResult
+    ) -> dict:
+        return {"price_analysis": result}
 
     def _get_fallback(self) -> PriceAnalysisResult:
         return PriceAnalysisResult(
@@ -80,8 +80,10 @@ class SellerAgent(BaseSpecialistAgent):
         self.system_prompt = SELLER_SYSTEM_PROMPT
         self.response_model = SellerAnalysisResult
 
-    def _update_state(self, state: InvestigationState, result: SellerAnalysisResult):
-        state["seller_analysis"] = result
+    def _update_state(
+        self, state: InvestigationState, result: SellerAnalysisResult
+    ) -> dict:
+        return {"seller_analysis": result}
 
     def _get_fallback(self) -> SellerAnalysisResult:
         return SellerAnalysisResult(
@@ -95,8 +97,10 @@ class BrandAgent(BaseSpecialistAgent):
         self.system_prompt = BRAND_SYSTEM_PROMPT
         self.response_model = BrandAnalysisResult
 
-    def _update_state(self, state: InvestigationState, result: BrandAnalysisResult):
-        state["brand_analysis"] = result
+    def _update_state(
+        self, state: InvestigationState, result: BrandAnalysisResult
+    ) -> dict:
+        return {"brand_analysis": result}
 
     def _get_fallback(self) -> BrandAnalysisResult:
         return BrandAnalysisResult(
@@ -110,8 +114,10 @@ class ReviewAgent(BaseSpecialistAgent):
         self.system_prompt = REVIEW_SYSTEM_PROMPT
         self.response_model = ReviewAnalysisResult
 
-    def _update_state(self, state: InvestigationState, result: ReviewAnalysisResult):
-        state["review_analysis"] = result
+    def _update_state(
+        self, state: InvestigationState, result: ReviewAnalysisResult
+    ) -> dict:
+        return {"review_analysis": result}
 
     def _get_fallback(self) -> ReviewAnalysisResult:
         return ReviewAnalysisResult(

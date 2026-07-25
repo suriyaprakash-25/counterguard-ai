@@ -15,7 +15,7 @@ class CoordinatorAgent:
     def __init__(self):
         self.llm_service = LLMService()
 
-    def run(self, state: InvestigationState) -> InvestigationState:
+    def run(self, state: InvestigationState) -> dict:
         logger.info("Running CoordinatorAgent to synthesize specialist findings.")
 
         specialist_results = {
@@ -44,14 +44,13 @@ class CoordinatorAgent:
                 user_prompt=user_prompt,
                 response_model=AIInvestigationResult,
             )
-            state["coordinator_result"] = result
+            return {"coordinator_result": result}
         except LLMServiceError as e:
             logger.error(f"CoordinatorAgent failed: {e}")
-            state["coordinator_result"] = AIInvestigationResult(
-                summary="AI analysis unavailable due to coordinator error.",
-                detailed_reasoning="The coordinator service failed to respond.",
+            fallback = AIInvestigationResult(
+                summary="AI Synthesis failed due to service error.",
+                detailed_reasoning="Unable to reach LLM service.",
                 suspicious_indicators=[],
-                confidence_score=50.0,
+                confidence_score=0.0,
             )
-
-        return state
+            return {"coordinator_result": fallback}

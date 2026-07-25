@@ -3,7 +3,6 @@ import logging
 from openai import OpenAI
 
 from backend.exceptions import CounterGuardError
-from backend.schemas.llm_models import AIInvestigationResult
 from backend.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -30,13 +29,15 @@ class LLMService:
         else:
             self.client = OpenAI(api_key=api_key)
 
-    def generate_investigation_result(
-        self, system_prompt: str, user_prompt: str
-    ) -> AIInvestigationResult:
+    def generate_structured_response(
+        self, system_prompt: str, user_prompt: str, response_model: type
+    ):
         """
-        Calls the LLM and forces a structured JSON output mapped to AIInvestigationResult.
+        Calls the LLM and forces a structured JSON output mapped to the given Pydantic model.
         """
-        logger.info(f"Querying LLM ({self.model_name}) for investigation reasoning.")
+        logger.info(
+            f"Querying LLM ({self.model_name}) for structured response: {response_model.__name__}."
+        )
         try:
             response = self.client.beta.chat.completions.parse(
                 model=self.model_name,
@@ -44,7 +45,7 @@ class LLMService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                response_format=AIInvestigationResult,
+                response_format=response_model,
                 timeout=self.timeout,
             )
 
@@ -57,4 +58,4 @@ class LLMService:
 
         except Exception as e:
             logger.error(f"LLM Service failed: {e}")
-            raise LLMServiceError(f"Failed to generate AI investigation result: {e}")
+            raise LLMServiceError(f"Failed to generate structured response: {e}")

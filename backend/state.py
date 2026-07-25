@@ -1,19 +1,46 @@
-from typing import List, Optional, TypedDict
+from typing import TypedDict
 
-from backend.types import EvidenceEvent, JSONDict
+from backend.schemas.investigation import (
+    AnalyzerResult,
+    EvidenceResult,
+    InvestigationReport,
+    InvestigationRequest,
+    RiskAssessment,
+)
+from backend.schemas.llm_models import (
+    AIInvestigationResult,
+    BrandAnalysisResult,
+    PriceAnalysisResult,
+    ReviewAnalysisResult,
+    SellerAnalysisResult,
+)
+from backend.schemas.scraping import ScrapingResult
 
 
-class InvestigationState(TypedDict):
+class InvestigationState(TypedDict, total=False):
     """
     Shared state that doubles as the Evidence Timeline.
-    This is the single source of truth for the investigation.
+    This is the single source of truth for the investigation across the graph.
     """
 
-    listing_id: str
-    listing_data: JSONDict
-    evidence_timeline: List[EvidenceEvent]
-    agent_findings: JSONDict
-    confidence_score: float
-    cross_query_count: int
+    request: InvestigationRequest
+    scraping_result: ScrapingResult
+    analysis: AnalyzerResult
+    evidence: EvidenceResult
+    risk: RiskAssessment
+
+    # Specialist outputs
+    price_analysis: PriceAnalysisResult
+    seller_analysis: SellerAnalysisResult
+    brand_analysis: BrandAnalysisResult
+    review_analysis: ReviewAnalysisResult
+
+    # Final AI synthesis
+    coordinator_result: AIInvestigationResult
+
+    # Final combined report
+    report: InvestigationReport
+
+    # Legacy fields
     status: str
-    legal_notice_draft: Optional[str]
+    error: str

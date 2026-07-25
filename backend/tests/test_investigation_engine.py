@@ -1,9 +1,8 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from backend.agents.analyzer import AnalyzerAgent
 from backend.agents.assessor import RiskAssessor
 from backend.agents.collector import EvidenceCollector
-from backend.agents.orchestrator import InvestigationOrchestrator
 from backend.agents.reporter import ReportGenerator
 from backend.schemas.investigation import InvestigationRequest
 from backend.schemas.scraping import ParsedListing, ScrapingResult
@@ -88,22 +87,47 @@ def test_reporter():
     assert report.recommendation == "Immediate takedown recommended."
 
 
-@patch("backend.services.scraping_service.ScrapingService.scrape")
-def test_orchestrator(mock_scrape):
-    mock_scrape.return_value = get_mock_scraping_result()
-    orchestrator = InvestigationOrchestrator()
-    request = InvestigationRequest(
-        listing_url="http://example.com", marketplace="Amazon"
+def get_mock_structured_response(system_prompt, user_prompt, response_model):
+    from backend.schemas.llm_models import (
+        AIInvestigationResult,
+        BrandAnalysisResult,
+        PriceAnalysisResult,
+        ReviewAnalysisResult,
+        SellerAnalysisResult,
     )
-    report = orchestrator.run(request)
 
-    assert report.risk_score == 100
-    assert report.risk_level == "HIGH"
+    if response_model == PriceAnalysisResult:
+        return PriceAnalysisResult(
+            anomaly_detected=True, reasoning="Mock", risk_score=50
+        )
+    elif response_model == SellerAnalysisResult:
+        return SellerAnalysisResult(
+            reputation_risk="High", reasoning="Mock", risk_score=50
+        )
+    elif response_model == BrandAnalysisResult:
+        return BrandAnalysisResult(
+            authenticity_flags=["Mock"], reasoning="Mock", risk_score=50
+        )
+    elif response_model == ReviewAnalysisResult:
+        return ReviewAnalysisResult(
+            fake_reviews_detected=True, reasoning="Mock", risk_score=50
+        )
+    elif response_model == AIInvestigationResult:
+        return AIInvestigationResult(
+            summary="Mock",
+            detailed_reasoning="Mock",
+            suspicious_indicators=["Mock"],
+            confidence_score=100.0,
+        )
+    return MagicMock()
 
 
 @patch("backend.services.scraping_service.ScrapingService.scrape")
-def test_investigation_service(mock_scrape):
+@patch("backend.services.llm_service.LLMService.generate_structured_response")
+def test_investigation_service(mock_generate, mock_scrape):
     mock_scrape.return_value = get_mock_scraping_result()
+    mock_generate.side_effect = get_mock_structured_response
+
     service = InvestigationService()
     request = InvestigationRequest(
         listing_url="http://example.com", marketplace="Amazon"
@@ -112,3 +136,4 @@ def test_investigation_service(mock_scrape):
 
     assert report.risk_score == 100
     assert report.risk_level == "HIGH"
+    assert report.confidence == 100.0

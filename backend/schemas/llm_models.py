@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class AIInvestigationResult(BaseModel):
     """
-    Structured output from the LLM Investigation Agent.
+    Structured output from the LLM Investigation Agent (Coordinator).
     """
 
     summary: str = Field(description="A concise summary of the AI's findings.")
@@ -20,3 +20,33 @@ class AIInvestigationResult(BaseModel):
         ge=0.0,
         le=100.0,
     )
+
+
+class PriceAnalysisResult(BaseModel):
+    anomaly_detected: bool = Field(
+        description="True if pricing anomalies are detected."
+    )
+    reasoning: str = Field(description="Explanation of the pricing evaluation.")
+    risk_score: int = Field(description="Risk score from 0 to 100.", ge=0, le=100)
+
+
+class SellerAnalysisResult(BaseModel):
+    reputation_risk: str = Field(description="High, Medium, or Low reputation risk.")
+    reasoning: str = Field(description="Explanation of the seller evaluation.")
+    risk_score: int = Field(description="Risk score from 0 to 100.", ge=0, le=100)
+
+
+class BrandAnalysisResult(BaseModel):
+    authenticity_flags: List[str] = Field(
+        description="List of brand inconsistency flags."
+    )
+    reasoning: str = Field(description="Explanation of the brand evaluation.")
+    risk_score: int = Field(description="Risk score from 0 to 100.", ge=0, le=100)
+
+
+class ReviewAnalysisResult(BaseModel):
+    fake_reviews_detected: bool = Field(
+        description="True if review patterns seem fake."
+    )
+    reasoning: str = Field(description="Explanation of the reviews evaluation.")
+    risk_score: int = Field(description="Risk score from 0 to 100.", ge=0, le=100)

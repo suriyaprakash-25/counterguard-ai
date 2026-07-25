@@ -15,7 +15,7 @@ class PlanningAgent:
     def __init__(self):
         self.llm_service = LLMService()
 
-    def run(self, state: InvestigationState) -> InvestigationState:
+    def run(self, state: InvestigationState) -> dict:
         logger.info("Running PlanningAgent to determine investigation strategy.")
 
         listing_data = (
@@ -40,12 +40,12 @@ class PlanningAgent:
                 user_prompt=user_prompt,
                 response_model=PlanningResult,
             )
-            state["planning_result"] = result
             logger.info(f"Planned Specialists: {result.selected_specialists}")
+            return {"planning_result": result}
         except LLMServiceError as e:
             logger.error(f"PlanningAgent failed: {e}")
             # Fallback plan: run all specialists to be safe
-            state["planning_result"] = PlanningResult(
+            fallback = PlanningResult(
                 selected_specialists=[
                     "PriceAgent",
                     "SellerAgent",
@@ -56,5 +56,4 @@ class PlanningAgent:
                 execution_strategy="Fallback plan: executing all specialists due to LLM error.",
                 rationale="Planner service was unavailable.",
             )
-
-        return state
+            return {"planning_result": fallback}

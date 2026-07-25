@@ -6,6 +6,7 @@ from backend.schemas.investigation import (
     InvestigationReport,
     RiskAssessment,
 )
+from backend.schemas.llm_models import AIInvestigationResult
 
 
 class ReportGenerator:
@@ -14,6 +15,7 @@ class ReportGenerator:
         analysis: AnalyzerResult,
         evidence: EvidenceResult,
         risk: RiskAssessment,
+        ai_result: AIInvestigationResult = None,
     ) -> InvestigationReport:
         """
         Synthesizes the findings into a final human-readable report.
@@ -38,6 +40,9 @@ class ReportGenerator:
         if "warranty" in se and se["warranty"]["status"] == "Missing":
             findings.append(f"Warranty: {se['warranty']['reason']}")
 
+        if ai_result and ai_result.suspicious_indicators:
+            findings.extend(ai_result.suspicious_indicators)
+
         if not findings:
             findings.append("No significant risk indicators found.")
 
@@ -60,6 +65,8 @@ class ReportGenerator:
             evidence_summary=evidence.structured_evidence,
             findings=findings,
             recommendation=recommendation,
-            confidence=0.85,  # Static for now, can be computed later
+            confidence=ai_result.confidence_score if ai_result else 0.85,
+            ai_summary=ai_result.summary if ai_result else "",
+            ai_reasoning=ai_result.detailed_reasoning if ai_result else "",
             investigation_timestamp=datetime.now(timezone.utc).isoformat(),
         )

@@ -22,6 +22,21 @@ class AIInvestigationResult(BaseModel):
     )
 
 
+class PlanningResult(BaseModel):
+    """
+    Structured output from the LLM Planning Agent.
+    """
+
+    selected_specialists: List[str] = Field(
+        description="List of specialist agents to execute (e.g., 'PriceAgent', 'SellerAgent', 'BrandAgent', 'ReviewAgent')."
+    )
+    priority: str = Field(description="Investigation priority (High, Medium, Low).")
+    execution_strategy: str = Field(
+        description="Description of how the investigation should proceed based on the initial context."
+    )
+    rationale: str = Field(description="Reasoning behind the chosen plan.")
+
+
 class PriceAnalysisResult(BaseModel):
     anomaly_detected: bool = Field(
         description="True if pricing anomalies are detected."

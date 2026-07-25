@@ -1,5 +1,6 @@
-from backend.state import InvestigationState
 from backend.constants import ESCALATION_THRESHOLD
+from backend.state import InvestigationState
+
 
 def route_after_fusion(state: InvestigationState) -> str:
     """

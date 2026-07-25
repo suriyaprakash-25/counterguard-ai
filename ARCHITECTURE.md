@@ -26,10 +26,10 @@ reasoning together." Judges notice the difference immediately in the demo.
 class InvestigationState(TypedDict):
     listing_id: str
     listing_data: Dict[str, Any]
-    evidence_timeline: List[Dict[str, Any]]   # <- this IS your dashboard feed
+    evidence_timeline: List[Dict[str, Any]]  # <- this IS your dashboard feed
     agent_findings: Dict[str, Any]
-    confidence_score: float                   # running total, updated live
-    cross_query_count: int                    # bounded, see below
+    confidence_score: float  # running total, updated live
+    cross_query_count: int  # bounded, see below
     status: str
     legal_notice_draft: Optional[str]
 ```
@@ -52,11 +52,11 @@ state schema right and the demo UI is nearly free.
 
 ```python
 def cross_query(state, asking_agent, target_agent, question) -> str:
-    if state["cross_query_count"] >= MAX_CROSS_QUERIES:   # cap = 5
+    if state["cross_query_count"] >= MAX_CROSS_QUERIES:  # cap = 5
         return "cap_reached"
-    log_event(state, asking_agent, "asks", f"→ {target_agent}: \"{question}\"")
+    log_event(state, asking_agent, "asks", f'→ {target_agent}: "{question}"')
     answer = AGENT_QUERY_HANDLERS[target_agent](question, state)
-    log_event(state, target_agent, "answers", f"→ {asking_agent}: \"{answer}\"")
+    log_event(state, target_agent, "answers", f'→ {asking_agent}: "{answer}"')
     state["cross_query_count"] += 1
     return answer
 ```

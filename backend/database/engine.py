@@ -50,12 +50,12 @@ def get_session_maker(
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
-def get_db_session(engine: Optional[Engine] = None) -> Generator[Session, None, None]:
+def get_db_session() -> Generator[Session, None, None]:
     """
     Generator function yielding a scoped SQLAlchemy Session.
     Ideal for FastAPI Dependency Injection and unit of work context handling.
     """
-    session_maker = get_session_maker(engine)
+    session_maker = get_session_maker()
     session = session_maker()
     try:
         yield session

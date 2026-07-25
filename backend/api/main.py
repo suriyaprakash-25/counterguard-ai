@@ -4,7 +4,7 @@ import os
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routes import investigation
+from backend.api.routes import investigation, investigations
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,8 +19,9 @@ app = FastAPI(
     * **Autonomous Scraping:** Uses custom PageFetcher and ParserFactory to intelligently scrape data from Amazon, Flipkart, eBay, etc.
     * **Multi-Agent Engine:** Analyzes products using AI agents (Analyzer, Collector, Assessor, Reporter).
     * **Risk Assessment:** Returns comprehensive, deterministic risk levels and JSON structured evidence.
+    * **Investigation History:** Persistent SQLite/Postgres querying, filtering, sorting, and management of investigation executions.
     """,
-    version="1.0.0",
+    version="1.1.0",
 )
 
 # CORS Middleware
@@ -46,6 +47,7 @@ async def log_requests(request, call_next):
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(investigation.router, tags=["Investigation"])
+api_router.include_router(investigations.router, tags=["Investigation History"])
 app.include_router(api_router)
 
 # Versioned router prefix (placeholder for future routes)

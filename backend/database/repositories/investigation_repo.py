@@ -40,19 +40,57 @@ class InvestigationRepository(IInvestigationRepository):
                 f"Database error querying investigation: {e}"
             ) from e
 
-    def get_all(self, limit: int = 100, offset: int = 0) -> List[InvestigationModel]:
+    def get_all(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        marketplace: Optional[str] = None,
+        status: Optional[str] = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> List[InvestigationModel]:
         try:
-            query = (
-                self._session.query(InvestigationModel)
-                .order_by(InvestigationModel.created_at.desc())
-                .limit(limit)
-                .offset(offset)
+            query = self._session.query(InvestigationModel)
+            if marketplace:
+                query = query.filter(
+                    InvestigationModel.marketplace.ilike(f"%{marketplace}%")
+                )
+            if status:
+                query = query.filter(InvestigationModel.status.ilike(f"%{status}%"))
+
+            sort_col = getattr(
+                InvestigationModel, sort_by, InvestigationModel.created_at
             )
-            return query.all()
+            if sort_order.lower() == "asc":
+                query = query.order_by(sort_col.asc())
+            else:
+                query = query.order_by(sort_col.desc())
+
+            return query.limit(limit).offset(offset).all()
         except SQLAlchemyError as e:
             logger.error(f"Failed to retrieve investigation list: {e}")
             raise CounterGuardError(
                 f"Database error listing investigations: {e}"
+            ) from e
+
+    def count(
+        self,
+        marketplace: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> int:
+        try:
+            query = self._session.query(InvestigationModel)
+            if marketplace:
+                query = query.filter(
+                    InvestigationModel.marketplace.ilike(f"%{marketplace}%")
+                )
+            if status:
+                query = query.filter(InvestigationModel.status.ilike(f"%{status}%"))
+            return query.count()
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to count investigations: {e}")
+            raise CounterGuardError(
+                f"Database error counting investigations: {e}"
             ) from e
 
     def update_status(

@@ -20,7 +20,23 @@ class IInvestigationRepository(ABC):
         pass
 
     @abstractmethod
-    def get_all(self, limit: int = 100, offset: int = 0) -> List[InvestigationModel]:
+    def get_all(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        marketplace: Optional[str] = None,
+        status: Optional[str] = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> List[InvestigationModel]:
+        pass
+
+    @abstractmethod
+    def count(
+        self,
+        marketplace: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> int:
         pass
 
     @abstractmethod

@@ -1,5 +1,7 @@
 import streamlit as st
+
 from frontend.streamlit_app.api.client import health
+
 
 def render_sidebar():
     st.sidebar.markdown("---")

@@ -1,6 +1,9 @@
-from pydantic import BaseModel
 from typing import List, Optional
-from backend.types import JSONDict, EvidenceEvent
+
+from pydantic import BaseModel
+
+from backend.types import EvidenceEvent, JSONDict
+
 
 class InvestigationResponse(BaseModel):
     listing_id: str

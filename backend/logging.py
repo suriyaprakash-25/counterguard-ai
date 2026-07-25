@@ -1,6 +1,8 @@
 import logging
 import sys
+
 from backend.settings import settings
+
 
 def get_logger(name: str) -> logging.Logger:
     """
@@ -15,10 +17,10 @@ def get_logger(name: str) -> logging.Logger:
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        
+
         # Use log level from settings, default to INFO if invalid
         log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
         logger.setLevel(log_level)
         logger.propagate = False
-        
+
     return logger

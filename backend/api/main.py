@@ -1,7 +1,10 @@
 import logging
-from fastapi import FastAPI, APIRouter
-from fastapi.middleware.cors import CORSMiddleware
 import os
+
+from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from backend.api.routes import investigation
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Logging Middleware Example (Native FastAPI middleware)
 @app.middleware("http")
 async def log_requests(request, call_next):
@@ -32,11 +36,13 @@ async def log_requests(request, call_next):
     logger.info(f"Response status: {response.status_code}")
     return response
 
-from backend.api.routes import investigation
+
+
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(investigation.router, tags=["Investigation"])
 app.include_router(api_router)
+
 
 @app.get("/health", tags=["System"])
 async def health_check():

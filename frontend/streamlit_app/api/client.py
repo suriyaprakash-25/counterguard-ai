@@ -1,9 +1,11 @@
 import os
+from typing import Any, Dict, Optional
+
 import requests
-from typing import Dict, Any, Optional
 
 # Read API URL from environment variables, fallback to localhost for development
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
 
 def health() -> bool:
     """
@@ -15,6 +17,7 @@ def health() -> bool:
     except requests.RequestException:
         return False
 
+
 def investigate(listing_url: str, marketplace: str) -> Optional[Dict[str, Any]]:
     """
     Call the investigate endpoint.
@@ -22,11 +25,8 @@ def investigate(listing_url: str, marketplace: str) -> Optional[Dict[str, Any]]:
     try:
         response = requests.post(
             f"{API_BASE_URL}/api/v1/investigate",
-            json={
-                "listing_url": listing_url,
-                "marketplace": marketplace
-            },
-            timeout=15
+            json={"listing_url": listing_url, "marketplace": marketplace},
+            timeout=15,
         )
         response.raise_for_status()
         return response.json()

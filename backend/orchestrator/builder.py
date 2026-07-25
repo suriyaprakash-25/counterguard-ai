@@ -1,5 +1,7 @@
 from langgraph.graph import StateGraph
+
 from backend.state import InvestigationState
+
 
 def build_graph() -> StateGraph:
     """

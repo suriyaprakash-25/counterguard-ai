@@ -80,7 +80,6 @@ else:
         f"Current score of {current_confidence}% triggers drafting of a "
         f"takedown notice."
     )
-)
 
 st.write("### Target: INV-892")
 

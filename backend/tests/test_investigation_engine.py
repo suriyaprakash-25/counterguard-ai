@@ -1,10 +1,29 @@
+from unittest.mock import patch
+
 from backend.agents.analyzer import AnalyzerAgent
 from backend.agents.assessor import RiskAssessor
 from backend.agents.collector import EvidenceCollector
 from backend.agents.orchestrator import InvestigationOrchestrator
 from backend.agents.reporter import ReportGenerator
 from backend.schemas.investigation import InvestigationRequest
+from backend.schemas.scraping import ParsedListing, ScrapingResult
 from backend.services.investigation_service import InvestigationService
+
+
+def get_mock_scraping_result():
+    return ScrapingResult(
+        success=True,
+        listing=ParsedListing(
+            brand="GenericBrand",
+            title="Suspicious Product from Amazon",
+            price=5.0,  # very_low_price
+            seller_rating=2.5,  # poor_seller_rating
+            seller_name="Unknown Seller",  # missing_seller
+            warranty_info=None,  # no_warranty
+            images_count=1,  # few_images
+            marketplace="Amazon",
+        ),
+    )
 
 
 def test_analyzer():
@@ -12,12 +31,12 @@ def test_analyzer():
     request = InvestigationRequest(
         listing_url="http://example.com", marketplace="Amazon"
     )
-    result = analyzer.analyze(request)
+    result = analyzer.analyze(request, get_mock_scraping_result())
     assert result.brand == "GenericBrand"
     assert result.marketplace == "Amazon"
-    assert result.price == 45.0
+    assert result.price == 5.0
     assert result.seller_rating == 2.5
-    assert "low_price" in result.risk_signals
+    assert "very_low_price" in result.risk_signals
 
 
 def test_collector():
@@ -26,12 +45,13 @@ def test_collector():
     request = InvestigationRequest(
         listing_url="http://example.com", marketplace="Amazon"
     )
-    analysis = analyzer.analyze(request)
+    analysis = analyzer.analyze(request, get_mock_scraping_result())
     evidence = collector.collect(analysis)
-    assert evidence.price_anomaly is True
-    assert evidence.seller_reputation == "Poor"
-    assert evidence.missing_warranty is True
-    assert evidence.listing_quality == "poor"
+    se = evidence.structured_evidence
+    assert se["price"]["status"] == "Suspicious"
+    assert se["seller"]["status"] == "Missing"
+    assert se["warranty"]["status"] == "Missing"
+    assert se["images"]["status"] == "Poor"
 
 
 def test_assessor():
@@ -41,7 +61,7 @@ def test_assessor():
     request = InvestigationRequest(
         listing_url="http://example.com", marketplace="Amazon"
     )
-    analysis = analyzer.analyze(request)
+    analysis = analyzer.analyze(request, get_mock_scraping_result())
     evidence = collector.collect(analysis)
     risk = assessor.assess(analysis, evidence)
     # price_anomaly (40) + rating < 3 (25) + missing warranty (10) + poor listing (10) + brand formatting (15) = 100
@@ -57,18 +77,20 @@ def test_reporter():
     request = InvestigationRequest(
         listing_url="http://example.com", marketplace="Amazon"
     )
-    analysis = analyzer.analyze(request)
+    analysis = analyzer.analyze(request, get_mock_scraping_result())
     evidence = collector.collect(analysis)
     risk = assessor.assess(analysis, evidence)
     report = reporter.generate(analysis, evidence, risk)
 
     assert report.risk_score == 100
     assert report.risk_level == "HIGH"
-    assert "Suspiciously low price detected" in report.findings[0]
+    assert any("Price Anomaly" in f for f in report.findings)
     assert report.recommendation == "Immediate takedown recommended."
 
 
-def test_orchestrator():
+@patch("backend.services.scraping_service.ScrapingService.scrape")
+def test_orchestrator(mock_scrape):
+    mock_scrape.return_value = get_mock_scraping_result()
     orchestrator = InvestigationOrchestrator()
     request = InvestigationRequest(
         listing_url="http://example.com", marketplace="Amazon"
@@ -79,7 +101,9 @@ def test_orchestrator():
     assert report.risk_level == "HIGH"
 
 
-def test_investigation_service():
+@patch("backend.services.scraping_service.ScrapingService.scrape")
+def test_investigation_service(mock_scrape):
+    mock_scrape.return_value = get_mock_scraping_result()
     service = InvestigationService()
     request = InvestigationRequest(
         listing_url="http://example.com", marketplace="Amazon"

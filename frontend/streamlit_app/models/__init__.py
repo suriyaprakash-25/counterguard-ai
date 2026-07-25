@@ -1,0 +1,3 @@
+"""
+Frontend models module initialization.
+"""

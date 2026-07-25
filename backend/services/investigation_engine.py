@@ -2,10 +2,10 @@ import time
 
 from backend.exceptions import InvestigationExecutionError
 from backend.logging import get_logger
+from backend.models.types import JSONDict
 from backend.orchestrator.graph import get_compiled_graph
 from backend.services.investigation_factory import InvestigationFactory
 from backend.state import InvestigationState
-from backend.types import JSONDict
 
 logger = get_logger(__name__)
 

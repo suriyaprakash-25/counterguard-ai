@@ -1,7 +1,6 @@
 """
-Response schema for investigation API endpoints.
-Independent Pydantic BaseModels serving as the serialization layer
-for the internal runtime InvestigationState TypedDict.
+Pydantic models for frontend type-safety and structured access to backend APIs.
+Uses modern Pydantic v2 conventions and model validation.
 """
 
 from typing import Dict, List, Optional
@@ -9,8 +8,8 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ListingDataResponse(BaseModel):
-    """Pydantic serialization model for target listing metadata."""
+class ListingData(BaseModel):
+    """Pydantic model representing e-commerce listing attributes."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -24,8 +23,8 @@ class ListingDataResponse(BaseModel):
     description: str = Field(..., description="Full promotional copy")
 
 
-class EvidenceEventResponse(BaseModel):
-    """Pydantic serialization model for atomic evidence timeline events."""
+class EvidenceEvent(BaseModel):
+    """Pydantic model representing atomic actions within an investigation."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -38,8 +37,8 @@ class EvidenceEventResponse(BaseModel):
     )
 
 
-class AgentFindingResponse(BaseModel):
-    """Pydantic serialization model for summary findings by an agent."""
+class AgentFinding(BaseModel):
+    """Pydantic model representing summary conclusions per agent."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,20 +46,17 @@ class AgentFindingResponse(BaseModel):
     severity: str = Field(..., description="Impact scale classification")
 
 
-class InvestigationResponse(BaseModel):
-    """
-    Pydantic response schema for investigation endpoints.
-    Serves as the external serialization layer for internal InvestigationState.
-    """
+class InvestigationState(BaseModel):
+    """Canonical representation of the active investigation across UI views."""
 
     model_config = ConfigDict(from_attributes=True)
 
     listing_id: str = Field(..., description="Unique investigation tracking ID")
-    listing_data: ListingDataResponse = Field(..., description="Item metadata")
-    evidence_timeline: List[EvidenceEventResponse] = Field(
+    listing_data: ListingData = Field(..., description="Item metadata")
+    evidence_timeline: List[EvidenceEvent] = Field(
         ..., description="Chronological audit log"
     )
-    agent_findings: Dict[str, AgentFindingResponse] = Field(
+    agent_findings: Dict[str, AgentFinding] = Field(
         ..., description="Mapped conclusions"
     )
     confidence_score: float = Field(..., description="Aggregate anomaly index")

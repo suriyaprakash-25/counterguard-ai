@@ -1,6 +1,8 @@
 import plotly.graph_objects as go
 import streamlit as st
 
+from frontend.streamlit_app.state import get_current_investigation
+
 st.set_page_config(page_title="Confidence Gauge", page_icon="📈")
 
 st.title("📈 Confidence Gauge")
@@ -23,17 +25,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-if "investigation_data" not in st.session_state:
+data = get_current_investigation()
+if not data:
     st.warning(
         "No investigation data found. "
         "Please start an investigation on the Investigation page."
     )
 else:
-    data = st.session_state.investigation_data
-    st.write(f"### Target: {data.get('listing_id', 'Unknown')}")
+    st.write(f"### Target: {data.listing_id}")
 
     # Gauge Chart using Plotly
-    current_confidence = data.get("confidence_score", 0)
+    current_confidence = data.confidence_score
 
     fig = go.Figure(
         go.Indicator(
@@ -76,57 +78,7 @@ else:
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.info(
-        f"💡 **Routing Logic:** Confidence ≥ 70 routes to Legal Escalation Agent.\n"
+        f"💡 **Routing Logic:** Confidence ≥ 70 routes to Legal Agent.\n"
         f"Current score of {current_confidence}% triggers drafting of a "
         f"takedown notice."
     )
-)
-
-st.write("### Target: INV-892")
-
-# Gauge Chart using Plotly
-current_confidence = 92
-
-fig = go.Figure(
-    go.Indicator(
-        mode="gauge+number",
-        value=current_confidence,
-        domain={"x": [0, 1], "y": [0, 1]},
-        title={
-            "text": "Counterfeit Probability",
-            "font": {"size": 24, "color": "white"},
-        },
-        gauge={
-            "axis": {"range": [None, 100], "tickwidth": 1, "tickcolor": "white"},
-            "bar": {"color": "#00ffaa"},
-            "bgcolor": "rgba(0,0,0,0)",
-            "borderwidth": 2,
-            "bordercolor": "gray",
-            "steps": [
-                {"range": [0, 40], "color": "rgba(0, 255, 0, 0.1)"},
-                {"range": [40, 70], "color": "rgba(255, 165, 0, 0.2)"},
-                {"range": [70, 100], "color": "rgba(255, 0, 0, 0.3)"},
-            ],
-            "threshold": {
-                "line": {"color": "red", "width": 4},
-                "thickness": 0.75,
-                "value": 70,
-            },
-        },
-        number={"font": {"color": "white"}},
-    )
-)
-
-fig.update_layout(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font={"color": "white", "family": "Arial"},
-)
-
-st.markdown('<div class="gauge-container">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown("</div>", unsafe_allow_html=True)
-
-st.info(
-    "💡 **Routing Logic:** Confidence ≥ 70 routes to Legal Escalation Agent. Current score of 92 triggers drafting of a takedown notice."
-)

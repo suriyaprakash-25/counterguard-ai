@@ -1,6 +1,13 @@
-from typing import List, Optional, TypedDict
+"""
+Canonical InvestigationState definition for CounterGuard.
+This module serves as the single source of truth for investigation state.
+"""
 
-from backend.types import EvidenceEvent, JSONDict
+from typing import Dict, List, Optional
+
+from typing_extensions import TypedDict
+
+from backend.models.types import AgentFinding, EvidenceEvent, ListingData
 
 
 class InvestigationState(TypedDict):
@@ -10,9 +17,9 @@ class InvestigationState(TypedDict):
     """
 
     listing_id: str
-    listing_data: JSONDict
+    listing_data: ListingData
     evidence_timeline: List[EvidenceEvent]
-    agent_findings: JSONDict
+    agent_findings: Dict[str, AgentFinding]
     confidence_score: float
     cross_query_count: int
     status: str

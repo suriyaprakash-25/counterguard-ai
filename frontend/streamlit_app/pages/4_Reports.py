@@ -25,6 +25,8 @@ st.markdown(
 st.subheader("Pending Approval: INV-892")
 
 st.warning(
+    "⚠️ **Human-in-the-Loop Required:** The Legal Agent "
+    "has drafted this notice but cannot auto-file."
     "⚠️ **Human-in-the-Loop Required:** The Legal Agent has drafted this notice but cannot auto-file."
 )
 
@@ -34,7 +36,8 @@ Subject: Notice of Claimed Infringement - Counterfeit Goods
 
 Dear eBay Legal Team,
 
-I am writing on behalf of the intellectual property owner. We have a good faith belief that the following listing(s) are offering counterfeit goods:
+I am writing on behalf of the intellectual property owner. We have a good faith
+belief that the following listing(s) are offering counterfeit goods:
 
 Listing ID: 9876543210
 Seller ID: TechDeals_99
@@ -42,9 +45,11 @@ URL: https://ebay.com/itm/9876543210
 
 Evidence Summary:
 1. Product price is 75% below wholesale minimum (Anomaly Score: 0.95)
-2. Image forensics indicate packaging logo misalignment consistent with known counterfeit batch C-44.
+2. Image forensics indicate packaging logo misalignment consistent with known
+   counterfeit batch C-44.
 3. Seller network analysis links this account to 3 previously suspended sellers.
-4. Seller failed to provide proof of authenticity when queried by mystery shopper.
+4. Seller failed to provide proof of authenticity when queried by mystery
+   shopper.
 
 Overall Confidence Score: 92%
 

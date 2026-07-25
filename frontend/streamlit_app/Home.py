@@ -1,5 +1,7 @@
 import streamlit as st
 
+from frontend.streamlit_app.components.sidebar import render_sidebar
+
 st.set_page_config(
     page_title="CounterGuard | Home",
     page_icon="🛡️",
@@ -64,7 +66,9 @@ st.markdown(
     """
 <div class="hero">
     <h1>🛡️ CounterGuard Dashboard</h1>
-    <p style="font-size: 1.2rem; color: #ccc;">Autonomous Counterfeit & Grey-Market Intelligence Network</p>
+    <p style="font-size: 1.2rem; color: #ccc;">
+        Autonomous Counterfeit & Grey-Market Intelligence Network
+    </p>
 </div>
 <br>
 """,
@@ -122,6 +126,7 @@ with col4:
 st.write("---")
 st.write("### 🚨 Recent Alerts")
 alerts_data = [
+
     {
         "ID": "INV-893",
         "Marketplace": "Amazon",
@@ -142,5 +147,7 @@ alerts_data = [
     },
 ]
 st.dataframe(alerts_data, use_container_width=True)
+
+render_sidebar()
 
 st.sidebar.success("Select a page above to drill down into investigations.")

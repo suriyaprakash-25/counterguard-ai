@@ -4,6 +4,11 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from backend.api.routes import investigation
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,6 +39,12 @@ async def log_requests(request, call_next):
     logger.info(f"Response status: {response.status_code}")
     return response
 
+
+
+
+api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(investigation.router, tags=["Investigation"])
+app.include_router(api_router)
 
 # Versioned router prefix (placeholder for future routes)
 # api_router = APIRouter(prefix="/api/v1")

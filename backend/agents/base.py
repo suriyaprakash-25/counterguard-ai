@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+
 from backend.state import InvestigationState
+
 
 class BaseAgent(ABC):
     """

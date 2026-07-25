@@ -5,7 +5,8 @@ st.set_page_config(page_title="Reports & Escalation", page_icon="📑")
 st.title("📑 Legal Escalation Reports")
 st.write("Review auto-drafted takedown notices before human-in-the-loop approval.")
 
-st.markdown("""
+st.markdown(
+    """
 <style>
     .draft-box {
         background-color: #1e1e1e;
@@ -17,11 +18,15 @@ st.markdown("""
         white-space: pre-wrap;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 st.subheader("Pending Approval: INV-892")
 
-st.warning("⚠️ **Human-in-the-Loop Required:** The Legal Agent has drafted this notice but cannot auto-file.")
+st.warning(
+    "⚠️ **Human-in-the-Loop Required:** The Legal Agent has drafted this notice but cannot auto-file."
+)
 
 draft_text = """[DRAFT TAKEDOWN NOTICE]
 To: eBay Trust & Safety

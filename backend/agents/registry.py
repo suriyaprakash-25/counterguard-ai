@@ -1,10 +1,13 @@
 from typing import Dict, Type
+
 from backend.agents.base import BaseAgent
+
 
 class AgentRegistry:
     """
     Registry for all CounterGuard agents.
     """
+
     _agents: Dict[str, Type[BaseAgent]] = {}
 
     @classmethod
@@ -12,6 +15,7 @@ class AgentRegistry:
         def decorator(agent_class: Type[BaseAgent]):
             cls._agents[name] = agent_class
             return agent_class
+
         return decorator
 
     @classmethod

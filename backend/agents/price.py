@@ -1,6 +1,7 @@
-from backend.state import InvestigationState
 from backend.agents.base import BaseAgent
 from backend.agents.registry import AgentRegistry
+from backend.state import InvestigationState
+
 
 @AgentRegistry.register("price")
 class PriceAnomalyAgent(BaseAgent):

@@ -10,6 +10,7 @@ from backend.schemas.investigation import (
 from backend.schemas.llm_models import (
     AIInvestigationResult,
     BrandAnalysisResult,
+    PlanningResult,
     PriceAnalysisResult,
     ReviewAnalysisResult,
     SellerAnalysisResult,
@@ -28,6 +29,11 @@ class InvestigationState(TypedDict, total=False):
     analysis: AnalyzerResult
     evidence: EvidenceResult
     risk: RiskAssessment
+
+    # AI Planning
+    planning_result: PlanningResult
+    remaining_specialists: list[str]
+    completed_specialists: list[str]
 
     # Specialist outputs
     price_analysis: PriceAnalysisResult

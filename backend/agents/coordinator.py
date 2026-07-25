@@ -19,16 +19,21 @@ class CoordinatorAgent:
         logger.info("Running CoordinatorAgent to synthesize specialist findings.")
 
         specialist_results = {
-            "price_analysis": state.get("price_analysis", {}),
-            "seller_analysis": state.get("seller_analysis", {}),
-            "brand_analysis": state.get("brand_analysis", {}),
-            "review_analysis": state.get("review_analysis", {}),
+            "price_analysis": state.get("price_analysis"),
+            "seller_analysis": state.get("seller_analysis"),
+            "brand_analysis": state.get("brand_analysis"),
+            "review_analysis": state.get("review_analysis"),
+        }
+
+        # Filter out specialists that were not executed
+        filtered_results = {
+            k: v for k, v in specialist_results.items() if v is not None
         }
 
         # Convert Pydantic models to dicts for JSON serialization
         formatted_results = {
             k: v.model_dump() if hasattr(v, "model_dump") else v
-            for k, v in specialist_results.items()
+            for k, v in filtered_results.items()
         }
 
         user_prompt = build_coordinator_user_prompt(formatted_results)

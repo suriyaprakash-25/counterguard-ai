@@ -4,19 +4,17 @@ from backend.agents.analyzer import AnalyzerAgent
 from backend.agents.assessor import RiskAssessor
 from backend.agents.collector import EvidenceCollector
 from backend.agents.coordinator import CoordinatorAgent
+from backend.agents.planner import PlanningAgent
 from backend.agents.reporter import ReportGenerator
-
-# New AI Agents
 from backend.agents.specialists import BrandAgent, PriceAgent, ReviewAgent, SellerAgent
-
-# Legacy agents
 from backend.services.scraping_service import ScrapingService
 from backend.state import InvestigationState
 
 
-def build_graph() -> StateGraph:
+def build_graph() -> StateGraph:  # noqa: C901
     """
     Builds and returns the LangGraph StateGraph for multi-agent collaborative investigation.
+    Implements dynamic routing based on the PlanningAgent's output.
     """
     graph = StateGraph(InvestigationState)
 
@@ -26,18 +24,17 @@ def build_graph() -> StateGraph:
     collector = EvidenceCollector()
     assessor = RiskAssessor()
     reporter = ReportGenerator()
-
+    planner_agent = PlanningAgent()
     price_agent = PriceAgent()
     seller_agent = SellerAgent()
     brand_agent = BrandAgent()
     review_agent = ReviewAgent()
     coordinator_agent = CoordinatorAgent()
 
-    # Define Node Wrappers (Adapting legacy methods to state dict)
+    # -- Node Wrappers for Legacy Agents --
     def node_scrape(state: InvestigationState):
         result = scraper.scrape(state["request"].listing_url)
         if not result.success:
-            # We store the error to handle it gracefully if needed, though originally it raised ValueError
             raise ValueError(f"Scraping failed: {result.error_message}")
         return {"scraping_result": result}
 
@@ -62,37 +59,89 @@ def build_graph() -> StateGraph:
             )
         }
 
+    # -- Node Wrappers for Dynamic Routing (State Tracking) --
+    def node_planner(state: InvestigationState):
+        new_state = planner_agent.run(state)
+        # Initialize execution tracking based on the plan
+        plan = new_state.get("planning_result")
+        if plan and plan.selected_specialists:
+            selected = plan.selected_specialists
+        else:
+            # Fallback if plan is somehow invalid
+            selected = ["PriceAgent", "SellerAgent", "BrandAgent", "ReviewAgent"]
+
+        new_state["remaining_specialists"] = list(selected)
+        new_state["completed_specialists"] = []
+        return new_state
+
+    def make_specialist_node(agent_func, agent_name):
+        def wrapper(state: InvestigationState):
+            new_state = agent_func(state)
+
+            rem = list(new_state.get("remaining_specialists", []))
+            if agent_name in rem:
+                rem.remove(agent_name)
+            new_state["remaining_specialists"] = rem
+
+            comp = list(new_state.get("completed_specialists", []))
+            comp.append(agent_name)
+            new_state["completed_specialists"] = comp
+
+            return new_state
+
+        return wrapper
+
+    # -- Routing Function --
+    def route_next_specialist(state: InvestigationState) -> str:
+        """
+        Dynamically routes the graph to the next requested specialist,
+        or to the coordinator if all requested specialists are complete.
+        """
+        rem = state.get("remaining_specialists", [])
+        if not rem:
+            return "coordinator"
+
+        next_agent = rem[0]
+        node_map = {
+            "PriceAgent": "price_agent",
+            "SellerAgent": "seller_agent",
+            "BrandAgent": "brand_agent",
+            "ReviewAgent": "review_agent",
+        }
+        return node_map.get(next_agent, "coordinator")
+
     # Add Nodes
     graph.add_node("scraper", node_scrape)
     graph.add_node("analyzer", node_analyze)
     graph.add_node("collector", node_evidence)
     graph.add_node("assessor", node_risk)
-
-    graph.add_node("price_agent", price_agent.run)
-    graph.add_node("seller_agent", seller_agent.run)
-    graph.add_node("brand_agent", brand_agent.run)
-    graph.add_node("review_agent", review_agent.run)
-
+    graph.add_node("planner", node_planner)
+    graph.add_node("price_agent", make_specialist_node(price_agent.run, "PriceAgent"))
+    graph.add_node(
+        "seller_agent", make_specialist_node(seller_agent.run, "SellerAgent")
+    )
+    graph.add_node("brand_agent", make_specialist_node(brand_agent.run, "BrandAgent"))
+    graph.add_node(
+        "review_agent", make_specialist_node(review_agent.run, "ReviewAgent")
+    )
     graph.add_node("coordinator", coordinator_agent.run)
     graph.add_node("reporter", node_report)
 
-    # Wire Edges
-    # Deterministic sequence
+    # Wire Edges (Deterministic early phases)
     graph.set_entry_point("scraper")
     graph.add_edge("scraper", "analyzer")
     graph.add_edge("analyzer", "collector")
     graph.add_edge("collector", "assessor")
+    graph.add_edge("assessor", "planner")
 
-    # Broadcast to specialists (Sequential for now, can be changed to parallel edges if LangGraph version supports it easily via add_edge)
-    graph.add_edge("assessor", "price_agent")
-    graph.add_edge("price_agent", "seller_agent")
-    graph.add_edge("seller_agent", "brand_agent")
-    graph.add_edge("brand_agent", "review_agent")
+    # Dynamic Routing
+    graph.add_conditional_edges("planner", route_next_specialist)
+    graph.add_conditional_edges("price_agent", route_next_specialist)
+    graph.add_conditional_edges("seller_agent", route_next_specialist)
+    graph.add_conditional_edges("brand_agent", route_next_specialist)
+    graph.add_conditional_edges("review_agent", route_next_specialist)
 
-    # Converge at coordinator
-    graph.add_edge("review_agent", "coordinator")
-
-    # Final reporting
+    # Finish Investigation
     graph.add_edge("coordinator", "reporter")
     graph.add_edge("reporter", END)
 

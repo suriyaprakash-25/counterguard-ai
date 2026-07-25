@@ -91,6 +91,7 @@ def get_mock_structured_response(system_prompt, user_prompt, response_model):
     from backend.schemas.llm_models import (
         AIInvestigationResult,
         BrandAnalysisResult,
+        PlanningResult,
         PriceAnalysisResult,
         ReviewAnalysisResult,
         SellerAnalysisResult,
@@ -111,6 +112,13 @@ def get_mock_structured_response(system_prompt, user_prompt, response_model):
     elif response_model == ReviewAnalysisResult:
         return ReviewAnalysisResult(
             fake_reviews_detected=True, reasoning="Mock", risk_score=50
+        )
+    elif response_model == PlanningResult:
+        return PlanningResult(
+            selected_specialists=["PriceAgent", "SellerAgent"],
+            priority="High",
+            execution_strategy="Mock",
+            rationale="Mock",
         )
     elif response_model == AIInvestigationResult:
         return AIInvestigationResult(
@@ -137,3 +145,46 @@ def test_investigation_service(mock_generate, mock_scrape):
     assert report.risk_score == 100
     assert report.risk_level == "HIGH"
     assert report.confidence == 100.0
+
+
+@patch("backend.services.scraping_service.ScrapingService.scrape")
+@patch("backend.services.llm_service.LLMService.generate_structured_response")
+@patch("backend.agents.specialists.SellerAgent.run")
+@patch("backend.agents.specialists.BrandAgent.run")
+def test_dynamic_routing(mock_brand_run, mock_seller_run, mock_generate, mock_scrape):
+    """
+    Tests that the LangGraph dynamically skips agents that are not selected by the planner.
+    """
+    mock_scrape.return_value = get_mock_scraping_result()
+
+    def custom_mock_response(system_prompt, user_prompt, response_model):
+        from backend.schemas.llm_models import PlanningResult
+
+        if response_model == PlanningResult:
+            # Planner ONLY selects PriceAgent and ReviewAgent
+            return PlanningResult(
+                selected_specialists=["PriceAgent", "ReviewAgent"],
+                priority="High",
+                execution_strategy="Mock",
+                rationale="Mock",
+            )
+        return get_mock_structured_response(system_prompt, user_prompt, response_model)
+
+    mock_generate.side_effect = custom_mock_response
+
+    service = InvestigationService()
+    request = InvestigationRequest(
+        listing_url="http://example.com", marketplace="Amazon"
+    )
+    # Re-compile graph to ensure it doesn't cache patched agents if any caching exists
+    from backend.orchestrator.graph import get_compiled_graph
+
+    service.graph = get_compiled_graph()
+
+    report = service.run_investigation(request)
+
+    # Asserts that unselected agents were entirely bypassed by LangGraph
+    mock_seller_run.assert_not_called()
+    mock_brand_run.assert_not_called()
+
+    assert report.risk_level == "HIGH"

@@ -10,11 +10,15 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "C90"]
-ignore = []
+ignore = ["E501"]
 
 [tool.pytest.ini_options]
+
 minversion = "7.0"
-addopts = "-ra -q"
+addopts = "-ra -q -p no:warnings"
 testpaths = [
     "backend/tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
 ]

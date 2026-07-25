@@ -1,6 +1,7 @@
 (
     ""
     """
+"""
 Application-wide constants.
 """
 )

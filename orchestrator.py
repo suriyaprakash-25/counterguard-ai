@@ -323,6 +323,7 @@ if __name__ == "__main__":
     print(
         f"Cross-agent queries used: {final_state['cross_query_count']}"
         f"/{MAX_CROSS_QUERIES}"
+        f"Cross-agent queries used: {final_state['cross_query_count']}/{MAX_CROSS_QUERIES}"
     )
     if final_state["legal_notice_draft"]:
         print("\n=== LEGAL DRAFT ===")

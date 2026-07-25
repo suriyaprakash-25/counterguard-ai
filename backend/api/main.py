@@ -1,6 +1,9 @@
 import logging
 import os
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -42,6 +45,10 @@ async def log_requests(request, call_next):
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(investigation.router, tags=["Investigation"])
 app.include_router(api_router)
+
+# Versioned router prefix (placeholder for future routes)
+# api_router = APIRouter(prefix="/api/v1")
+# app.include_router(api_router)
 
 
 @app.get("/health", tags=["System"])

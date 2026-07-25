@@ -27,6 +27,7 @@ st.subheader("Pending Approval: INV-892")
 st.warning(
     "⚠️ **Human-in-the-Loop Required:** The Legal Agent "
     "has drafted this notice but cannot auto-file."
+    "⚠️ **Human-in-the-Loop Required:** The Legal Agent has drafted this notice but cannot auto-file."
 )
 
 draft_text = """[DRAFT TAKEDOWN NOTICE]

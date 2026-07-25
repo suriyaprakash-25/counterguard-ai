@@ -10,7 +10,8 @@ st.set_page_config(
 )
 
 # Custom CSS for Premium Design
-st.markdown("""
+st.markdown(
+    """
 <style>
     .main {
         background-color: #0E1117;
@@ -57,9 +58,12 @@ st.markdown("""
         color: #00ffaa;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-st.markdown("""
+st.markdown(
+    """
 <div class="hero">
     <h1>🛡️ CounterGuard Dashboard</h1>
     <p style="font-size: 1.2rem; color: #ccc;">
@@ -67,43 +71,57 @@ st.markdown("""
     </p>
 </div>
 <br>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 st.write("### 🌐 Live Global Telemetry")
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.markdown("""
+    st.markdown(
+        """
     <div class="metric-card">
         <div class="metric-title">Active Investigations</div>
         <div class="metric-value">124</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with col2:
-    st.markdown("""
+    st.markdown(
+        """
     <div class="metric-card">
         <div class="metric-title">Listings Scanned (24h)</div>
         <div class="metric-value">45.2K</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with col3:
-    st.markdown("""
+    st.markdown(
+        """
     <div class="metric-card">
         <div class="metric-title">Counterfeits Detected</div>
         <div class="metric-value">89</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with col4:
-    st.markdown("""
+    st.markdown(
+        """
     <div class="metric-card">
         <div class="metric-title">Enforcement Actions</div>
         <div class="metric-value">12</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 st.write("---")
 st.write("### 🚨 Recent Alerts")

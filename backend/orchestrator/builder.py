@@ -1,5 +1,3 @@
-from langgraph.graph import StateGraph
-
 from langgraph.graph import END, StateGraph
 
 # Ensure the ScoutAgent is registered before retrieving

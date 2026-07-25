@@ -1,9 +1,6 @@
 import logging
 import os
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -38,8 +35,6 @@ async def log_requests(request, call_next):
     response = await call_next(request)
     logger.info(f"Response status: {response.status_code}")
     return response
-
-
 
 
 api_router = APIRouter(prefix="/api/v1")

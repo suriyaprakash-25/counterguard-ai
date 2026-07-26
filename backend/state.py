@@ -16,6 +16,14 @@ from backend.schemas.llm_models import (
     SellerAnalysisResult,
 )
 from backend.schemas.scraping import ScrapingResult
+from backend.tools.mocks import (
+    CatalogOutput,
+    ImageOutput,
+    PriceOutput,
+    ReputationOutput,
+    TrademarkOutput,
+    WhoisOutput,
+)
 
 
 class InvestigationState(TypedDict, total=False):
@@ -38,6 +46,14 @@ class InvestigationState(TypedDict, total=False):
     seller_analysis: SellerAnalysisResult
     brand_analysis: BrandAnalysisResult
     review_analysis: ReviewAnalysisResult
+
+    # Tool outputs (Strongly typed)
+    whois_data: WhoisOutput
+    reputation_data: ReputationOutput
+    trademark_data: TrademarkOutput
+    catalog_data: CatalogOutput
+    price_history: PriceOutput
+    image_data: ImageOutput
 
     # Final AI synthesis
     coordinator_result: AIInvestigationResult

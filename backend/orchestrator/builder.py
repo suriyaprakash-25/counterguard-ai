@@ -10,6 +10,11 @@ from backend.agents.coordinator import CoordinatorAgent
 from backend.agents.planner import PlanningAgent
 from backend.agents.reporter import ReportGenerator
 from backend.agents.specialists import BrandAgent, PriceAgent, ReviewAgent, SellerAgent
+from backend.dependencies import neo4j_client
+from backend.graph.extractors.entity_extractor import EntityExtractor
+from backend.graph.repositories.neo4j_repository import Neo4jGraphRepository
+from backend.graph.services.builder_service import GraphBuilderService
+from backend.graph.services.intelligence_service import IntelligenceService
 
 # Memory Imports
 from backend.memory.models.domain import InvestigationEpisode, SellerIdentity
@@ -60,6 +65,12 @@ def build_graph() -> StateGraph:  # noqa: C901
         investigation_repo, seller_repo, embedding_service, vector_store
     )
 
+    # Initialize graph subsystem
+    graph_repo = Neo4jGraphRepository(neo4j_client)
+    entity_extractor = EntityExtractor()
+    graph_builder = GraphBuilderService(graph_repo)
+    intelligence_service = IntelligenceService(graph_repo)
+
     # Initialize agent instances
     scraper = ScrapingService()
     analyzer = AnalyzerAgent()
@@ -85,7 +96,7 @@ def build_graph() -> StateGraph:  # noqa: C901
     review_agent = ReviewAgent(tools=[registry.get_tool("reverse_image_search")])
     coordinator_agent = CoordinatorAgent()
 
-    # -- Memory Nodes --
+    # -- Intelligence Nodes --
     def node_retrieve_memory(state: InvestigationState):
         listing = (
             state.get("scraping_result").listing
@@ -99,7 +110,19 @@ def build_graph() -> StateGraph:  # noqa: C901
         memories = memory_service.search_similar(query, top_k=3, min_similarity=0.4)
         return {"historical_memories": memories}
 
-    def node_save_memory(state: InvestigationState):
+    def node_retrieve_graph(state: InvestigationState):
+        listing = (
+            state.get("scraping_result").listing
+            if state.get("scraping_result")
+            else None
+        )
+        if not listing or not listing.seller_name:
+            return {"graph_intelligence": {}}
+
+        summary = intelligence_service.generate_graph_summary(listing.seller_name)
+        return {"graph_intelligence": summary}
+
+    def node_save_memory_and_graph(state: InvestigationState):
         report = state.get("report")
         listing = (
             state.get("scraping_result").listing
@@ -124,7 +147,13 @@ def build_graph() -> StateGraph:  # noqa: C901
                 risk_score=risk.risk_score,
                 summary=coordinator.summary,
             )
+            # Save to SQLite and Chroma
             memory_service.save_episode(episode)
+
+            # Extract and save to Neo4j Knowledge Graph
+            entities = entity_extractor.extract(episode)
+            graph_builder.build_from_entities(entities)
+
         return {}
 
     # -- Node Wrappers for Legacy Agents --
@@ -178,6 +207,7 @@ def build_graph() -> StateGraph:  # noqa: C901
     # Add Nodes
     graph.add_node("scraper", node_scrape)
     graph.add_node("retrieve_memory", node_retrieve_memory)
+    graph.add_node("retrieve_graph", node_retrieve_graph)
     graph.add_node("analyzer", node_analyze)
     graph.add_node("collector", node_evidence)
     graph.add_node("assessor", node_risk)
@@ -190,12 +220,13 @@ def build_graph() -> StateGraph:  # noqa: C901
 
     graph.add_node("coordinator", coordinator_agent.run)
     graph.add_node("reporter", node_report)
-    graph.add_node("save_memory", node_save_memory)
+    graph.add_node("save_memory", node_save_memory_and_graph)
 
     # Wire Edges
     graph.set_entry_point("scraper")
     graph.add_edge("scraper", "retrieve_memory")
-    graph.add_edge("retrieve_memory", "analyzer")
+    graph.add_edge("retrieve_memory", "retrieve_graph")
+    graph.add_edge("retrieve_graph", "analyzer")
     graph.add_edge("analyzer", "collector")
     graph.add_edge("collector", "assessor")
     graph.add_edge("assessor", "planner")

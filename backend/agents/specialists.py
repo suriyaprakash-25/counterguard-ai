@@ -51,10 +51,11 @@ class BaseSpecialistAgent:
         tool_data_for_prompt, state_updates = self._execute_tools(state)
 
         user_prompt = build_specialist_user_prompt(
-            listing_data,
-            evidence_data,
+            listing_data=listing_data,
+            evidence_data=evidence_data,
             tool_data=tool_data_for_prompt,
-            memories=state.get("historical_memories"),
+            memories=state.get("historical_memories", []),
+            graph_intelligence=state.get("graph_intelligence", {}),
         )
 
         try:

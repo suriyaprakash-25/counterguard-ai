@@ -42,6 +42,9 @@ def test_price_agent(mock_generate, mock_state):
 
 @patch("backend.services.llm_service.LLMService.generate_structured_response")
 def test_coordinator_agent(mock_generate, mock_state):
+    from backend.collaboration.models.context import InvestigationContext
+    from backend.collaboration.models.protocol import AgentObservation
+
     mock_result = AIInvestigationResult(
         summary="Looks fake",
         detailed_reasoning="Price and seller bad",
@@ -50,14 +53,26 @@ def test_coordinator_agent(mock_generate, mock_state):
     )
     mock_generate.return_value = mock_result
 
-    # Pre-populate state
-    mock_state["price_analysis"] = PriceAnalysisResult(
-        anomaly_detected=True, reasoning="Bad", risk_score=90
+    context = InvestigationContext(investigation_id="test")
+    context.shared_observations.append(
+        AgentObservation(source_agent="Test", content="Bad", confidence=0.9)
     )
+    from backend.memory.models.domain import Evidence, EvidenceType, ValidationStatus
+
+    context.shared_evidence.append(
+        Evidence(
+            evidence_type=EvidenceType.METADATA,
+            content="Clear proof",
+            validation_status=ValidationStatus.VERIFIED,
+        )
+    )
+
+    # Pre-populate state
+    mock_state["context"] = context
 
     agent = CoordinatorAgent()
     state = agent.run(mock_state)
 
     assert "coordinator_result" in state
-    assert state["coordinator_result"].confidence_score == 90.0
+    assert state["coordinator_result"].confidence_score >= 0.6
     assert state["coordinator_result"].summary == "Looks fake"

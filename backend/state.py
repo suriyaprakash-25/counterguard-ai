@@ -1,6 +1,6 @@
-from typing import TypedDict
+from typing import Annotated, Dict, TypedDict
 
-from backend.memory.models.domain import MemorySearchResult
+from backend.collaboration.models.context import AgentWorkspace, InvestigationContext
 from backend.schemas.investigation import (
     AnalyzerResult,
     EvidenceResult,
@@ -8,29 +8,44 @@ from backend.schemas.investigation import (
     InvestigationRequest,
     RiskAssessment,
 )
-from backend.schemas.llm_models import (
-    AIInvestigationResult,
-    BrandAnalysisResult,
-    PlanningResult,
-    PriceAnalysisResult,
-    ReviewAnalysisResult,
-    SellerAnalysisResult,
-)
+from backend.schemas.llm_models import AIInvestigationResult, PlanningResult
 from backend.schemas.scraping import ScrapingResult
-from backend.tools.mocks import (
-    CatalogOutput,
-    ImageOutput,
-    PriceOutput,
-    ReputationOutput,
-    TrademarkOutput,
-    WhoisOutput,
-)
+
+
+def merge_context(
+    a: InvestigationContext, b: InvestigationContext
+) -> InvestigationContext:
+    if not a:
+        return b
+    if not b:
+        return a
+
+    # Create a new instance to avoid mutating the original
+    merged = a.model_copy()
+
+    # Safely merge lists avoiding duplicates by ID if possible, otherwise extend
+    merged.shared_evidence.extend(
+        [e for e in b.shared_evidence if e not in a.shared_evidence]
+    )
+    merged.shared_observations.extend(
+        [o for o in b.shared_observations if o not in a.shared_observations]
+    )
+    merged.unresolved_questions.extend(
+        [q for q in b.unresolved_questions if q not in a.unresolved_questions]
+    )
+    merged.tasks.extend([t for t in b.tasks if t not in a.tasks])
+    merged.confidence_timeline.extend(b.confidence_timeline)
+
+    # Deep merge dicts
+    if b.graph_intelligence:
+        merged.graph_intelligence.update(b.graph_intelligence)
+
+    return merged
 
 
 class InvestigationState(TypedDict, total=False):
     """
-    Shared state that doubles as the Evidence Timeline.
-    This is the single source of truth for the investigation across the graph.
+    Shared state containing the legacy pipeline outputs and the new Collaborative Blackboard.
     """
 
     request: InvestigationRequest
@@ -38,34 +53,17 @@ class InvestigationState(TypedDict, total=False):
     analysis: AnalyzerResult
     evidence: EvidenceResult
     risk: RiskAssessment
-
-    # AI Planning
     planning_result: PlanningResult
 
-    # Specialist outputs
-    price_analysis: PriceAnalysisResult
-    seller_analysis: SellerAnalysisResult
-    brand_analysis: BrandAnalysisResult
-    review_analysis: ReviewAnalysisResult
+    # -- SPRINT 12: COLLABORATIVE BLACKBOARD --
+    context: Annotated[InvestigationContext, merge_context]
+    workspaces: Dict[str, AgentWorkspace]  # Maps agent name to their workspace
 
-    # Tool outputs (Strongly typed)
-    whois_data: WhoisOutput
-    reputation_data: ReputationOutput
-    trademark_data: TrademarkOutput
-    catalog_data: CatalogOutput
-    price_history: PriceOutput
-    image_data: ImageOutput
+    # Explanations
+    explanation: str
 
-    # Long-Term Memory & Intelligence
-    historical_memories: list[MemorySearchResult]
-    graph_intelligence: dict
-
-    # Final AI synthesis
+    # Legacy Outputs
     coordinator_result: AIInvestigationResult
-
-    # Final combined report
     report: InvestigationReport
-
-    # Legacy fields
     status: str
     error: str

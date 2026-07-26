@@ -1,5 +1,9 @@
 import logging
 
+from backend.collaboration.models.context import InvestigationContext
+from backend.collaboration.services.consensus import ConsensusService
+from backend.collaboration.services.explainability import ExplainabilityService
+from backend.collaboration.services.validation import ValidationService
 from backend.prompts.specialist_prompts import (
     COORDINATOR_SYSTEM_PROMPT,
     build_coordinator_user_prompt,
@@ -14,26 +18,43 @@ logger = logging.getLogger(__name__)
 class CoordinatorAgent:
     def __init__(self):
         self.llm_service = LLMService()
+        self.validation_service = ValidationService()
+        self.consensus_service = ConsensusService()
+        self.explainability_service = ExplainabilityService()
 
     def run(self, state: InvestigationState) -> dict:
-        logger.info("Running CoordinatorAgent to synthesize specialist findings.")
+        logger.info("Running CoordinatorAgent to synthesize Blackboard context.")
 
-        specialist_results = {
-            "price_analysis": state.get("price_analysis"),
-            "seller_analysis": state.get("seller_analysis"),
-            "brand_analysis": state.get("brand_analysis"),
-            "review_analysis": state.get("review_analysis"),
-        }
+        context: InvestigationContext = state.get("context")
+        if not context:
+            logger.warning("No InvestigationContext found. Creating empty context.")
+            context = InvestigationContext(investigation_id="temp")
 
-        # Filter out specialists that were not executed
-        filtered_results = {
-            k: v for k, v in specialist_results.items() if v is not None
-        }
+        # 1. Validate Evidence
+        self.validation_service.validate_evidence(context)
 
-        # Convert Pydantic models to dicts for JSON serialization
+        # 2. Resolve Conflicts
+        conflicts = self.consensus_service.resolve_conflicts(context)
+
+        # 3. Calculate Final Confidence
+        final_confidence = self.consensus_service.calculate_consensus_confidence(
+            context
+        )
+
+        # 4. Generate Explainability Report
+        explanation = self.explainability_service.generate_explanation(
+            context, final_confidence
+        )
+
+        # Format Blackboard data for the LLM
         formatted_results = {
-            k: v.model_dump() if hasattr(v, "model_dump") else v
-            for k, v in filtered_results.items()
+            "evidence": [e.model_dump(mode="json") for e in context.shared_evidence],
+            "observations": [
+                o.model_dump(mode="json") for o in context.shared_observations
+            ],
+            "conflicts": conflicts,
+            "final_confidence": final_confidence,
+            "graph_intelligence": context.graph_intelligence,
         }
 
         user_prompt = build_coordinator_user_prompt(formatted_results)
@@ -44,7 +65,14 @@ class CoordinatorAgent:
                 user_prompt=user_prompt,
                 response_model=AIInvestigationResult,
             )
-            return {"coordinator_result": result}
+            # Override LLM confidence with computed Consensus confidence
+            result.confidence_score = final_confidence
+
+            return {
+                "coordinator_result": result,
+                "context": context,
+                "explanation": explanation,
+            }
         except LLMServiceError as e:
             logger.error(f"CoordinatorAgent failed: {e}")
             fallback = AIInvestigationResult(
@@ -53,4 +81,8 @@ class CoordinatorAgent:
                 suspicious_indicators=[],
                 confidence_score=0.0,
             )
-            return {"coordinator_result": fallback}
+            return {
+                "coordinator_result": fallback,
+                "context": context,
+                "explanation": explanation,
+            }

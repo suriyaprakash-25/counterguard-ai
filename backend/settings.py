@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
 
     # Infrastructure
-    DATABASE_URL: Optional[str] = None
+    DATABASE_URL: Optional[str] = "sqlite:///./counterguard.db"
     REDIS_URL: Optional[str] = None
 
     # Scraping Config

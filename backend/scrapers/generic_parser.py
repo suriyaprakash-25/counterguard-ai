@@ -166,10 +166,12 @@ class GenericParser(BaseParser):
 
     def _extract_description(self, soup: BeautifulSoup) -> Optional[str]:
         desc_div = soup.find(
-            lambda tag: tag.name == "div"
-            and any(
-                "description" in c.lower()
-                for c in tag.get("class", []) + [tag.get("id", "")]
+            lambda tag: (
+                tag.name == "div"
+                and any(
+                    "description" in c.lower()
+                    for c in tag.get("class", []) + [tag.get("id", "")]
+                )
             )
         )
         if desc_div:

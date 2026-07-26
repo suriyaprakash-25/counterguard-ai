@@ -55,3 +55,15 @@ class ParsingError(CounterGuardError):
     """Raised when the parser fails to extract data."""
 
     pass
+
+
+class ToolNotFoundError(CounterGuardError):
+    """Raised when a requested tool is not found in the registry."""
+
+    pass
+
+
+class ToolExecutionError(CounterGuardError):
+    """Raised when an external tool fails to execute or receives invalid inputs."""
+
+    pass

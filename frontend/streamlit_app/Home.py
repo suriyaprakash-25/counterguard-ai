@@ -126,7 +126,6 @@ with col4:
 st.write("---")
 st.write("### 🚨 Recent Alerts")
 alerts_data = [
-
     {
         "ID": "INV-893",
         "Marketplace": "Amazon",

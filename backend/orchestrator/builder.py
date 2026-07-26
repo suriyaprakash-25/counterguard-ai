@@ -1,3 +1,4 @@
+import uuid
 from typing import List
 
 from langgraph.graph import END, StateGraph
@@ -9,16 +10,55 @@ from backend.agents.coordinator import CoordinatorAgent
 from backend.agents.planner import PlanningAgent
 from backend.agents.reporter import ReportGenerator
 from backend.agents.specialists import BrandAgent, PriceAgent, ReviewAgent, SellerAgent
+
+# Memory Imports
+from backend.memory.models.domain import InvestigationEpisode, SellerIdentity
+from backend.memory.repositories.sqlite_repository import (
+    SQLiteInvestigationRepository,
+    SQLiteSellerRepository,
+)
+from backend.memory.services.embedding_service import (
+    EmbeddingService,
+    OpenAIEmbeddingProvider,
+)
+from backend.memory.services.memory_service import MemoryService
+from backend.memory.vector.chroma_store import ChromaMemoryStore
 from backend.services.scraping_service import ScrapingService
 from backend.state import InvestigationState
+from backend.tools.mocks import (
+    MockPriceVerificationTool,
+    MockProductCatalogTool,
+    MockReverseImageTool,
+    MockSellerReputationTool,
+    MockTrademarkTool,
+    MockWhoisTool,
+)
+from backend.tools.registry import ToolRegistry
 
 
 def build_graph() -> StateGraph:  # noqa: C901
     """
     Builds and returns the LangGraph StateGraph for multi-agent collaborative investigation.
-    Implements parallel dynamic routing based on the PlanningAgent's output.
     """
     graph = StateGraph(InvestigationState)
+
+    # Initialize tool registry
+    registry = ToolRegistry()
+    registry.register(MockPriceVerificationTool())
+    registry.register(MockWhoisTool())
+    registry.register(MockTrademarkTool())
+    registry.register(MockReverseImageTool())
+    registry.register(MockSellerReputationTool())
+    registry.register(MockProductCatalogTool())
+
+    # Initialize memory subsystem
+    investigation_repo = SQLiteInvestigationRepository()
+    seller_repo = SQLiteSellerRepository()
+    embedding_service = EmbeddingService(OpenAIEmbeddingProvider())
+    vector_store = ChromaMemoryStore()
+    memory_service = MemoryService(
+        investigation_repo, seller_repo, embedding_service, vector_store
+    )
 
     # Initialize agent instances
     scraper = ScrapingService()
@@ -27,11 +67,65 @@ def build_graph() -> StateGraph:  # noqa: C901
     assessor = RiskAssessor()
     reporter = ReportGenerator()
     planner_agent = PlanningAgent()
-    price_agent = PriceAgent()
-    seller_agent = SellerAgent()
-    brand_agent = BrandAgent()
-    review_agent = ReviewAgent()
+
+    # Inject multiple tools into specialists
+    price_agent = PriceAgent(tools=[registry.get_tool("price_history")])
+    seller_agent = SellerAgent(
+        tools=[
+            registry.get_tool("whois_lookup"),
+            registry.get_tool("seller_reputation"),
+        ]
+    )
+    brand_agent = BrandAgent(
+        tools=[
+            registry.get_tool("trademark_lookup"),
+            registry.get_tool("product_catalog"),
+        ]
+    )
+    review_agent = ReviewAgent(tools=[registry.get_tool("reverse_image_search")])
     coordinator_agent = CoordinatorAgent()
+
+    # -- Memory Nodes --
+    def node_retrieve_memory(state: InvestigationState):
+        listing = (
+            state.get("scraping_result").listing
+            if state.get("scraping_result")
+            else None
+        )
+        if not listing:
+            return {"historical_memories": []}
+
+        query = f"Brand: {listing.brand}. Title: {listing.title}. Seller: {listing.seller_name}"
+        memories = memory_service.search_similar(query, top_k=3, min_similarity=0.4)
+        return {"historical_memories": memories}
+
+    def node_save_memory(state: InvestigationState):
+        report = state.get("report")
+        listing = (
+            state.get("scraping_result").listing
+            if state.get("scraping_result")
+            else None
+        )
+        risk = state.get("risk")
+        coordinator = state.get("coordinator_result")
+
+        if report and listing and risk and coordinator:
+            episode = InvestigationEpisode(
+                id=str(uuid.uuid4()),
+                seller_identity=SellerIdentity(name=listing.seller_name or "Unknown"),
+                marketplace="Amazon"
+                if "amazon" in state["request"].listing_url.lower()
+                else "Unknown",
+                verdict="Counterfeit"
+                if coordinator.confidence_score > 70
+                else (
+                    "Suspicious" if coordinator.confidence_score > 40 else "Authentic"
+                ),
+                risk_score=risk.risk_score,
+                summary=coordinator.summary,
+            )
+            memory_service.save_episode(episode)
+        return {}
 
     # -- Node Wrappers for Legacy Agents --
     def node_scrape(state: InvestigationState):
@@ -63,15 +157,10 @@ def build_graph() -> StateGraph:  # noqa: C901
 
     # -- Parallel Routing Function --
     def route_to_specialists(state: InvestigationState) -> List[str]:
-        """
-        Dynamically routes the graph to all requested specialists concurrently.
-        Returns a list of node names to execute in parallel.
-        """
         plan = state.get("planning_result")
         if plan and plan.selected_specialists:
             selected = plan.selected_specialists
         else:
-            # Fallback if plan is somehow invalid or missing
             selected = ["PriceAgent", "SellerAgent", "BrandAgent", "ReviewAgent"]
 
         node_map = {
@@ -82,21 +171,18 @@ def build_graph() -> StateGraph:  # noqa: C901
         }
 
         destinations = [node_map[s] for s in selected if s in node_map]
-
-        # If no specialists are selected, bypass straight to the coordinator
         if not destinations:
             return ["coordinator"]
-
         return destinations
 
     # Add Nodes
     graph.add_node("scraper", node_scrape)
+    graph.add_node("retrieve_memory", node_retrieve_memory)
     graph.add_node("analyzer", node_analyze)
     graph.add_node("collector", node_evidence)
     graph.add_node("assessor", node_risk)
     graph.add_node("planner", planner_agent.run)
 
-    # Directly add specialists without state-tracking wrappers
     graph.add_node("price_agent", price_agent.run)
     graph.add_node("seller_agent", seller_agent.run)
     graph.add_node("brand_agent", brand_agent.run)
@@ -104,27 +190,25 @@ def build_graph() -> StateGraph:  # noqa: C901
 
     graph.add_node("coordinator", coordinator_agent.run)
     graph.add_node("reporter", node_report)
+    graph.add_node("save_memory", node_save_memory)
 
-    # Wire Edges (Deterministic early phases)
+    # Wire Edges
     graph.set_entry_point("scraper")
-    graph.add_edge("scraper", "analyzer")
+    graph.add_edge("scraper", "retrieve_memory")
+    graph.add_edge("retrieve_memory", "analyzer")
     graph.add_edge("analyzer", "collector")
     graph.add_edge("collector", "assessor")
     graph.add_edge("assessor", "planner")
 
-    # Dynamic Parallel Routing (Fan-Out)
     graph.add_conditional_edges("planner", route_to_specialists)
 
-    # Synchronization (Fan-In)
-    # LangGraph will run these agents concurrently. Once all activated edges complete,
-    # the destination node ("coordinator") is queued and executes exactly once.
     graph.add_edge("price_agent", "coordinator")
     graph.add_edge("seller_agent", "coordinator")
     graph.add_edge("brand_agent", "coordinator")
     graph.add_edge("review_agent", "coordinator")
 
-    # Finish Investigation
     graph.add_edge("coordinator", "reporter")
-    graph.add_edge("reporter", END)
+    graph.add_edge("reporter", "save_memory")
+    graph.add_edge("save_memory", END)
 
     return graph

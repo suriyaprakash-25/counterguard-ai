@@ -1,14 +1,28 @@
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import investigation
+from backend.dependencies import neo4j_client
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting up CounterGuard API...")
+    neo4j_client.connect()
+    yield
+    # Shutdown
+    logger.info("Shutting down CounterGuard API...")
+    neo4j_client.close()
+
 
 app = FastAPI(
     title="CounterGuard API",
@@ -21,6 +35,7 @@ app = FastAPI(
     * **Risk Assessment:** Returns comprehensive, deterministic risk levels and JSON structured evidence.
     """,
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS Middleware

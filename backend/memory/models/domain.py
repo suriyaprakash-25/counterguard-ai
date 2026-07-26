@@ -12,6 +12,8 @@ class EvidenceType(str, Enum):
     CHAT = "Chat"
     METADATA = "Metadata"
     INVOICE = "Invoice"
+    PRODUCT = "Product"
+    SELLER_INFO = "SellerInfo"
 
 
 class Evidence(BaseModel):
@@ -28,6 +30,9 @@ class SellerIdentity(BaseModel):
     name: str
     domain: Optional[str] = None
     marketplace_id: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
 
 
 class SellerProfile(BaseModel):

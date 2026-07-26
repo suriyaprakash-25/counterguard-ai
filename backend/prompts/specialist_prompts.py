@@ -47,6 +47,7 @@ def build_specialist_user_prompt(
     evidence_data: dict,
     tool_data: dict = None,
     memories: list = None,
+    graph_intelligence: dict = None,
 ) -> str:
     prompt = f"""
 Please analyze the following data within your specialized domain:
@@ -66,6 +67,11 @@ Please analyze the following data within your specialized domain:
         prompt += f"""
 # Historical Memories (Past Investigations)
 {json.dumps([m.model_dump() for m in memories], indent=2, default=str)}
+"""
+    if graph_intelligence:
+        prompt += f"""
+# Knowledge Graph Intelligence (Connected Network & Shared Identifiers)
+{json.dumps(graph_intelligence, indent=2)}
 """
 
     prompt += "\nBased on this data, provide your structured JSON evaluation.\n"

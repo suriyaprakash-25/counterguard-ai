@@ -56,8 +56,9 @@ class InvestigationState(TypedDict, total=False):
     price_history: PriceOutput
     image_data: ImageOutput
 
-    # Long-Term Memory
+    # Long-Term Memory & Intelligence
     historical_memories: list[MemorySearchResult]
+    graph_intelligence: dict
 
     # Final AI synthesis
     coordinator_result: AIInvestigationResult

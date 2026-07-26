@@ -53,15 +53,13 @@ class BaseSpecialistAgent:
         tool_data_for_prompt, state_updates = self._execute_tools(state)
 
         context: InvestigationContext = state.get("context")
-        memories = context.memory_context if context else []
-        graph_intel = context.graph_intelligence if context else {}
+        graphrag_markdown = context.graphrag_context if context else ""
 
         user_prompt = build_specialist_user_prompt(
             listing_data=listing_data,
             evidence_data=evidence_data,
             tool_data=tool_data_for_prompt,
-            memories=memories,
-            graph_intelligence=graph_intel,
+            graphrag_context=graphrag_markdown,
         )
 
         try:

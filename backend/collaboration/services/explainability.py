@@ -39,13 +39,18 @@ class ExplainabilityService:
                 )
 
         # Add Graph Intelligence
-        if context.graph_intelligence:
+        if context.graphrag_intelligence:
             explanation_lines.append("\nGraph Intelligence:")
-            explanation_lines.append(
-                f"  - Network Risk Multiplier: {context.graph_intelligence.get('network_risk_multiplier', 1.0)}"
-            )
-            shared = context.graph_intelligence.get("shared_identifiers", {})
-            if shared:
-                explanation_lines.append(f"  - Shared Identifiers Found: {len(shared)}")
+            if hasattr(context.graphrag_intelligence, "network_risk"):
+                explanation_lines.append(
+                    f"  - Network Risk: {context.graphrag_intelligence.network_risk}"
+                )
+            if (
+                hasattr(context.graphrag_intelligence, "shared_entities")
+                and context.graphrag_intelligence.shared_entities
+            ):
+                explanation_lines.append(
+                    f"  - Shared Entities Found: {len(context.graphrag_intelligence.shared_entities)}"
+                )
 
         return "\n".join(explanation_lines)

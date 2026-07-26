@@ -14,7 +14,7 @@ from backend.dependencies import neo4j_client
 from backend.graph.extractors.entity_extractor import EntityExtractor
 from backend.graph.repositories.neo4j_repository import Neo4jGraphRepository
 from backend.graph.services.builder_service import GraphBuilderService
-from backend.graph.services.intelligence_service import IntelligenceService
+from backend.graphrag.services.graphrag_service import GraphRAGService
 
 # Memory Imports
 from backend.memory.models.domain import InvestigationEpisode, SellerIdentity
@@ -69,7 +69,10 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph_repo = Neo4jGraphRepository(neo4j_client)
     entity_extractor = EntityExtractor()
     graph_builder = GraphBuilderService(graph_repo)
-    intelligence_service = IntelligenceService(graph_repo)
+
+    graphrag_service = GraphRAGService(
+        investigation_repo, seller_repo, memory_service, graph_repo
+    )
 
     # Initialize agent instances
     scraper = ScrapingService()
@@ -96,50 +99,29 @@ def build_graph() -> StateGraph:  # noqa: C901
     review_agent = ReviewAgent(tools=[registry.get_tool("reverse_image_search")])
     coordinator_agent = CoordinatorAgent()
 
-    # -- Intelligence Nodes --
-    def node_retrieve_memory(state: InvestigationState):
+    # -- GraphRAG Integration Node --
+    def node_graphrag(state: InvestigationState):
         listing = (
             state.get("scraping_result").listing
             if state.get("scraping_result")
             else None
         )
 
-        # Initialize Blackboard
         from backend.collaboration.models.context import InvestigationContext
 
         context = InvestigationContext(investigation_id=str(uuid.uuid4()))
 
-        if not listing:
-            context.memory_context = []
-            return {"historical_memories": [], "context": context}
+        if not listing or not listing.seller_name:
+            return {"context": context}
 
-        query = f"Brand: {listing.brand}. Title: {listing.title}. Seller: {listing.seller_name}"
-        memories = memory_service.search_similar(query, top_k=3, min_similarity=0.4)
-
-        # Add memory to Blackboard
-        context.memory_context = [m.model_dump() for m in memories]
-
-        return {"historical_memories": memories, "context": context}
-
-    def node_retrieve_graph(state: InvestigationState):
-        listing = (
-            state.get("scraping_result").listing
-            if state.get("scraping_result")
-            else None
+        rag_result = graphrag_service.generate_intelligence_context(
+            seller_name=listing.seller_name, listing_title=listing.title
         )
 
-        from backend.collaboration.models.context import InvestigationContext
+        context.graphrag_intelligence = rag_result["intelligence_model"]
+        context.graphrag_context = rag_result["markdown_context"]
 
-        context = InvestigationContext(investigation_id="temp")
-
-        if not listing or not listing.seller_name:
-            context.graph_intelligence = {}
-            return {"graph_intelligence": {}, "context": context}
-
-        summary = intelligence_service.generate_graph_summary(listing.seller_name)
-        context.graph_intelligence = summary
-
-        return {"graph_intelligence": summary, "context": context}
+        return {"context": context}
 
     def node_save_memory_and_graph(state: InvestigationState):
         report = state.get("report")
@@ -225,8 +207,7 @@ def build_graph() -> StateGraph:  # noqa: C901
 
     # Add Nodes
     graph.add_node("scraper", node_scrape)
-    graph.add_node("retrieve_memory", node_retrieve_memory)
-    graph.add_node("retrieve_graph", node_retrieve_graph)
+    graph.add_node("graphrag", node_graphrag)
     graph.add_node("analyzer", node_analyze)
     graph.add_node("collector", node_evidence)
     graph.add_node("assessor", node_risk)
@@ -243,9 +224,8 @@ def build_graph() -> StateGraph:  # noqa: C901
 
     # Wire Edges
     graph.set_entry_point("scraper")
-    graph.add_edge("scraper", "retrieve_memory")
-    graph.add_edge("retrieve_memory", "retrieve_graph")
-    graph.add_edge("retrieve_graph", "analyzer")
+    graph.add_edge("scraper", "graphrag")
+    graph.add_edge("graphrag", "analyzer")
     graph.add_edge("analyzer", "collector")
     graph.add_edge("collector", "assessor")
     graph.add_edge("assessor", "planner")

@@ -64,7 +64,11 @@ class ConsensusService:
         base_confidence = total_confidence / count
 
         # Adjust based on Graph Intelligence Risk
-        risk_multiplier = context.graph_intelligence.get("network_risk_multiplier", 1.0)
+        risk_multiplier = 1.0
+        if context.graphrag_intelligence and hasattr(
+            context.graphrag_intelligence, "network_risk"
+        ):
+            risk_multiplier += context.graphrag_intelligence.network_risk * 0.2
 
         final_confidence = min(max(base_confidence * risk_multiplier, 0.0), 1.0)
 

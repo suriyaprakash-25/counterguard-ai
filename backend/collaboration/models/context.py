@@ -39,9 +39,9 @@ class InvestigationContext(BaseModel):
     hypotheses: List[str] = Field(default_factory=list)
     tasks: List[InvestigationTask] = Field(default_factory=list)
 
-    # External Context Injected into Blackboard
-    memory_context: List[Dict[str, Any]] = Field(default_factory=list)
-    graph_intelligence: Dict[str, Any] = Field(default_factory=dict)
+    # External Context Injected into Blackboard via GraphRAG
+    graphrag_intelligence: Any = None  # Holds InvestigationIntelligence model
+    graphrag_context: str = ""  # Holds the markdown context string
 
     # Analytics
     confidence_timeline: List[Dict[str, Any]] = Field(default_factory=list)

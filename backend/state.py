@@ -36,9 +36,11 @@ def merge_context(
     merged.tasks.extend([t for t in b.tasks if t not in a.tasks])
     merged.confidence_timeline.extend(b.confidence_timeline)
 
-    # Deep merge dicts
-    if b.graph_intelligence:
-        merged.graph_intelligence.update(b.graph_intelligence)
+    # Merge GraphRAG Intelligence
+    if b.graphrag_intelligence:
+        merged.graphrag_intelligence = b.graphrag_intelligence
+    if b.graphrag_context:
+        merged.graphrag_context = b.graphrag_context
 
     return merged
 

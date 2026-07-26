@@ -54,9 +54,12 @@ class ValidationService:
         phone = evidence.metadata.get("phone")
 
         # If Graph Intelligence flags this phone as suspicious
-        if phone and context.graph_intelligence:
-            shared_ids = context.graph_intelligence.get("shared_identifiers", {})
-            if phone in shared_ids.get("Phone", []):
+        if (
+            phone
+            and context.graphrag_intelligence
+            and hasattr(context.graphrag_intelligence, "shared_entities")
+        ):
+            if phone in context.graphrag_intelligence.shared_entities:
                 # Validated but highly suspicious
                 evidence.validation_status = ValidationStatus.VERIFIED
                 evidence.reasoning = "Phone verified as shared with known fraud ring via Graph Intelligence."

@@ -54,7 +54,7 @@ class CoordinatorAgent:
             ],
             "conflicts": conflicts,
             "final_confidence": final_confidence,
-            "graph_intelligence": context.graph_intelligence,
+            "graphrag_context": context.graphrag_context,
         }
 
         user_prompt = build_coordinator_user_prompt(formatted_results)

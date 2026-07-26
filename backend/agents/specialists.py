@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from backend.prompts.specialist_prompts import (
     BRAND_SYSTEM_PROMPT,
@@ -15,15 +16,25 @@ from backend.schemas.llm_models import (
 )
 from backend.services.llm_service import LLMService, LLMServiceError
 from backend.state import InvestigationState
+from backend.tools.base import BaseTool
+from backend.tools.mocks import (
+    CatalogInput,
+    ImageInput,
+    PriceInput,
+    ReputationInput,
+    TrademarkInput,
+    WhoisInput,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class BaseSpecialistAgent:
-    def __init__(self):
+    def __init__(self, tools: list[BaseTool] = None):
         self.llm_service = LLMService()
         self.system_prompt = ""
         self.response_model = None
+        self.tools = tools or []
 
     def run(self, state: InvestigationState) -> dict:
         logger.info(f"Running {self.__class__.__name__}")
@@ -37,7 +48,11 @@ class BaseSpecialistAgent:
             state.get("evidence").model_dump() if state.get("evidence") else {}
         )
 
-        user_prompt = build_specialist_user_prompt(listing_data, evidence_data)
+        tool_data_for_prompt, state_updates = self._execute_tools(state)
+
+        user_prompt = build_specialist_user_prompt(
+            listing_data, evidence_data, tool_data=tool_data_for_prompt
+        )
 
         try:
             result = self.llm_service.generate_structured_response(
@@ -45,10 +60,47 @@ class BaseSpecialistAgent:
                 user_prompt=user_prompt,
                 response_model=self.response_model,
             )
-            return self._update_state(state, result)
+            llm_updates = self._update_state(state, result)
+            return {**state_updates, **llm_updates}
         except LLMServiceError as e:
             logger.error(f"{self.__class__.__name__} failed: {e}")
-            return self._update_state(state, self._get_fallback())
+            llm_updates = self._update_state(state, self._get_fallback())
+            return {**state_updates, **llm_updates}
+
+    def _execute_tools(self, state: InvestigationState) -> tuple[dict | None, dict]:
+        """Returns (tool_data_for_prompt_dict, state_update_dict)"""
+        if not self.tools:
+            return None, {}
+
+        tool_outputs = {}
+        all_state_updates = {}
+
+        for tool in self.tools:
+            try:
+                input_data = self._prepare_tool_input(tool.name, state)
+                if input_data:
+                    logger.info(
+                        f"Executing tool {tool.name} in {self.__class__.__name__}"
+                    )
+                    result = tool.execute(input_data)
+                    tool_outputs[tool.name] = result.model_dump()
+                    all_state_updates.update(
+                        self._map_tool_result_to_state(tool.name, result)
+                    )
+            except Exception as e:
+                logger.warning(f"Tool {tool.name} failed: {e}. Degrading gracefully.")
+                # We continue to the next tool!
+
+        if not tool_outputs:
+            return None, {}
+
+        return tool_outputs, all_state_updates
+
+    def _prepare_tool_input(self, tool_name: str, state: InvestigationState) -> Any:
+        return None
+
+    def _map_tool_result_to_state(self, tool_name: str, result: Any) -> dict:
+        return {}
 
     def _update_state(self, state: InvestigationState, result) -> dict:
         raise NotImplementedError
@@ -58,10 +110,27 @@ class BaseSpecialistAgent:
 
 
 class PriceAgent(BaseSpecialistAgent):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, tools: list[BaseTool] = None):
+        super().__init__(tools)
         self.system_prompt = PRICE_SYSTEM_PROMPT
         self.response_model = PriceAnalysisResult
+
+    def _prepare_tool_input(self, tool_name: str, state: InvestigationState) -> Any:
+        listing = (
+            state.get("scraping_result").listing
+            if state.get("scraping_result")
+            else None
+        )
+        title = listing.title if listing and listing.title else "Unknown Product"
+
+        if tool_name == "price_history":
+            return PriceInput(product_name=title)
+        return None
+
+    def _map_tool_result_to_state(self, tool_name: str, result: Any) -> dict:
+        if tool_name == "price_history":
+            return {"price_history": result}
+        return {}
 
     def _update_state(
         self, state: InvestigationState, result: PriceAnalysisResult
@@ -75,10 +144,35 @@ class PriceAgent(BaseSpecialistAgent):
 
 
 class SellerAgent(BaseSpecialistAgent):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, tools: list[BaseTool] = None):
+        super().__init__(tools)
         self.system_prompt = SELLER_SYSTEM_PROMPT
         self.response_model = SellerAnalysisResult
+
+    def _prepare_tool_input(self, tool_name: str, state: InvestigationState) -> Any:
+        listing = (
+            state.get("scraping_result").listing
+            if state.get("scraping_result")
+            else None
+        )
+        seller = (
+            listing.seller_name
+            if listing and listing.seller_name
+            else "UnknownSeller.com"
+        )
+
+        if tool_name == "whois_lookup":
+            return WhoisInput(domain=seller)
+        elif tool_name == "seller_reputation":
+            return ReputationInput(seller_name=seller)
+        return None
+
+    def _map_tool_result_to_state(self, tool_name: str, result: Any) -> dict:
+        if tool_name == "whois_lookup":
+            return {"whois_data": result}
+        elif tool_name == "seller_reputation":
+            return {"reputation_data": result}
+        return {}
 
     def _update_state(
         self, state: InvestigationState, result: SellerAnalysisResult
@@ -92,10 +186,32 @@ class SellerAgent(BaseSpecialistAgent):
 
 
 class BrandAgent(BaseSpecialistAgent):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, tools: list[BaseTool] = None):
+        super().__init__(tools)
         self.system_prompt = BRAND_SYSTEM_PROMPT
         self.response_model = BrandAnalysisResult
+
+    def _prepare_tool_input(self, tool_name: str, state: InvestigationState) -> Any:
+        listing = (
+            state.get("scraping_result").listing
+            if state.get("scraping_result")
+            else None
+        )
+        brand = listing.brand if listing and listing.brand else "UnknownBrand"
+        title = listing.title if listing and listing.title else "Unknown Product"
+
+        if tool_name == "trademark_lookup":
+            return TrademarkInput(brand_name=brand)
+        elif tool_name == "product_catalog":
+            return CatalogInput(brand_name=brand, product_title=title)
+        return None
+
+    def _map_tool_result_to_state(self, tool_name: str, result: Any) -> dict:
+        if tool_name == "trademark_lookup":
+            return {"trademark_data": result}
+        elif tool_name == "product_catalog":
+            return {"catalog_data": result}
+        return {}
 
     def _update_state(
         self, state: InvestigationState, result: BrandAnalysisResult
@@ -109,10 +225,27 @@ class BrandAgent(BaseSpecialistAgent):
 
 
 class ReviewAgent(BaseSpecialistAgent):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, tools: list[BaseTool] = None):
+        super().__init__(tools)
         self.system_prompt = REVIEW_SYSTEM_PROMPT
         self.response_model = ReviewAnalysisResult
+
+    def _prepare_tool_input(self, tool_name: str, state: InvestigationState) -> Any:
+        listing = (
+            state.get("scraping_result").listing
+            if state.get("scraping_result")
+            else None
+        )
+        brand = listing.brand if listing and listing.brand else "Unknown"
+
+        if tool_name == "reverse_image_search":
+            return ImageInput(image_url=f"http://example.com/images/{brand}.jpg")
+        return None
+
+    def _map_tool_result_to_state(self, tool_name: str, result: Any) -> dict:
+        if tool_name == "reverse_image_search":
+            return {"image_data": result}
+        return {}
 
     def _update_state(
         self, state: InvestigationState, result: ReviewAnalysisResult

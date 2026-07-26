@@ -11,6 +11,13 @@ from backend.agents.reporter import ReportGenerator
 from backend.agents.specialists import BrandAgent, PriceAgent, ReviewAgent, SellerAgent
 from backend.services.scraping_service import ScrapingService
 from backend.state import InvestigationState
+from backend.tools.mocks import (
+    MockPriceVerificationTool,
+    MockReverseImageTool,
+    MockTrademarkTool,
+    MockWhoisTool,
+)
+from backend.tools.registry import ToolRegistry
 
 
 def build_graph() -> StateGraph:  # noqa: C901
@@ -20,6 +27,19 @@ def build_graph() -> StateGraph:  # noqa: C901
     """
     graph = StateGraph(InvestigationState)
 
+    # Initialize tool registry
+    registry = ToolRegistry()
+    registry.register(MockPriceVerificationTool())
+    registry.register(MockWhoisTool())
+    registry.register(MockTrademarkTool())
+    registry.register(MockReverseImageTool())
+
+    # Sprint 9.2: new mock tools
+    from backend.tools.mocks import MockProductCatalogTool, MockSellerReputationTool
+
+    registry.register(MockSellerReputationTool())
+    registry.register(MockProductCatalogTool())
+
     # Initialize agent instances
     scraper = ScrapingService()
     analyzer = AnalyzerAgent()
@@ -27,10 +47,23 @@ def build_graph() -> StateGraph:  # noqa: C901
     assessor = RiskAssessor()
     reporter = ReportGenerator()
     planner_agent = PlanningAgent()
-    price_agent = PriceAgent()
-    seller_agent = SellerAgent()
-    brand_agent = BrandAgent()
-    review_agent = ReviewAgent()
+
+    # Inject multiple tools into specialists
+    price_agent = PriceAgent(tools=[registry.get_tool("price_history")])
+    seller_agent = SellerAgent(
+        tools=[
+            registry.get_tool("whois_lookup"),
+            registry.get_tool("seller_reputation"),
+        ]
+    )
+    brand_agent = BrandAgent(
+        tools=[
+            registry.get_tool("trademark_lookup"),
+            registry.get_tool("product_catalog"),
+        ]
+    )
+    review_agent = ReviewAgent(tools=[registry.get_tool("reverse_image_search")])
+
     coordinator_agent = CoordinatorAgent()
 
     # -- Node Wrappers for Legacy Agents --

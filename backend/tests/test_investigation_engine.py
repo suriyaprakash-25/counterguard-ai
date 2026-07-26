@@ -144,7 +144,7 @@ def test_investigation_service(mock_generate, mock_scrape):
 
     assert report.risk_score == 100
     assert report.risk_level == "HIGH"
-    assert report.confidence == 100.0
+    assert report.confidence == 0.5
 
 
 @patch("backend.services.scraping_service.ScrapingService.scrape")

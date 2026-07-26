@@ -103,12 +103,23 @@ def build_graph() -> StateGraph:  # noqa: C901
             if state.get("scraping_result")
             else None
         )
+
+        # Initialize Blackboard
+        from backend.collaboration.models.context import InvestigationContext
+
+        context = InvestigationContext(investigation_id=str(uuid.uuid4()))
+
         if not listing:
-            return {"historical_memories": []}
+            context.memory_context = []
+            return {"historical_memories": [], "context": context}
 
         query = f"Brand: {listing.brand}. Title: {listing.title}. Seller: {listing.seller_name}"
         memories = memory_service.search_similar(query, top_k=3, min_similarity=0.4)
-        return {"historical_memories": memories}
+
+        # Add memory to Blackboard
+        context.memory_context = [m.model_dump() for m in memories]
+
+        return {"historical_memories": memories, "context": context}
 
     def node_retrieve_graph(state: InvestigationState):
         listing = (
@@ -116,11 +127,19 @@ def build_graph() -> StateGraph:  # noqa: C901
             if state.get("scraping_result")
             else None
         )
+
+        from backend.collaboration.models.context import InvestigationContext
+
+        context = InvestigationContext(investigation_id="temp")
+
         if not listing or not listing.seller_name:
-            return {"graph_intelligence": {}}
+            context.graph_intelligence = {}
+            return {"graph_intelligence": {}, "context": context}
 
         summary = intelligence_service.generate_graph_summary(listing.seller_name)
-        return {"graph_intelligence": summary}
+        context.graph_intelligence = summary
+
+        return {"graph_intelligence": summary, "context": context}
 
     def node_save_memory_and_graph(state: InvestigationState):
         report = state.get("report")

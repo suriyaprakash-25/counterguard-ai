@@ -1,7 +1,6 @@
 import logging
 
 from backend.exceptions import CounterGuardError
-from backend.orchestrator.graph import get_compiled_graph
 from backend.schemas.investigation import InvestigationReport, InvestigationRequest
 from backend.state import InvestigationState
 
@@ -10,10 +9,13 @@ logger = logging.getLogger(__name__)
 
 class InvestigationService:
     def __init__(self):
-        # We compile the graph once when the service starts
-        self.graph = get_compiled_graph()
+        # The graph will be built on demand
+        self.graph = None
 
     def run_investigation(self, request: InvestigationRequest) -> InvestigationReport:
+        from backend.orchestrator.graph import get_compiled_graph
+
+        graph = get_compiled_graph()
         """
         Executes the LangGraph multi-agent investigation workflow.
         """
@@ -23,7 +25,7 @@ class InvestigationService:
 
         try:
             # LangGraph's invoke returns the final state dict
-            final_state = self.graph.invoke(initial_state)
+            final_state = graph.invoke(initial_state)
 
             if "report" not in final_state:
                 raise CounterGuardError(

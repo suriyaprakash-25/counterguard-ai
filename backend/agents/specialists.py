@@ -1,6 +1,8 @@
 import logging
 from typing import Any
 
+from backend.collaboration.models.context import InvestigationContext
+from backend.collaboration.models.protocol import AgentObservation
 from backend.prompts.specialist_prompts import (
     BRAND_SYSTEM_PROMPT,
     PRICE_SYSTEM_PROMPT,
@@ -50,12 +52,16 @@ class BaseSpecialistAgent:
 
         tool_data_for_prompt, state_updates = self._execute_tools(state)
 
+        context: InvestigationContext = state.get("context")
+        memories = context.memory_context if context else []
+        graph_intel = context.graph_intelligence if context else {}
+
         user_prompt = build_specialist_user_prompt(
             listing_data=listing_data,
             evidence_data=evidence_data,
             tool_data=tool_data_for_prompt,
-            memories=state.get("historical_memories", []),
-            graph_intelligence=state.get("graph_intelligence", {}),
+            memories=memories,
+            graph_intelligence=graph_intel,
         )
 
         try:
@@ -139,7 +145,15 @@ class PriceAgent(BaseSpecialistAgent):
     def _update_state(
         self, state: InvestigationState, result: PriceAnalysisResult
     ) -> dict:
-        return {"price_analysis": result}
+        new_context = InvestigationContext(investigation_id="temp")
+        new_context.shared_observations.append(
+            AgentObservation(
+                source_agent="PriceAgent",
+                content=f"Risk Score: {result.risk_score}. Reasoning: {result.reasoning}",
+                metadata={"anomaly_detected": result.anomaly_detected},
+            )
+        )
+        return {"price_analysis": result, "context": new_context}
 
     def _get_fallback(self) -> PriceAnalysisResult:
         return PriceAnalysisResult(
@@ -181,7 +195,15 @@ class SellerAgent(BaseSpecialistAgent):
     def _update_state(
         self, state: InvestigationState, result: SellerAnalysisResult
     ) -> dict:
-        return {"seller_analysis": result}
+        new_context = InvestigationContext(investigation_id="temp")
+        new_context.shared_observations.append(
+            AgentObservation(
+                source_agent="SellerAgent",
+                content=f"Risk Score: {result.risk_score}. Reasoning: {result.reasoning}",
+                metadata={"reputation_risk": result.reputation_risk},
+            )
+        )
+        return {"seller_analysis": result, "context": new_context}
 
     def _get_fallback(self) -> SellerAnalysisResult:
         return SellerAnalysisResult(
@@ -220,7 +242,15 @@ class BrandAgent(BaseSpecialistAgent):
     def _update_state(
         self, state: InvestigationState, result: BrandAnalysisResult
     ) -> dict:
-        return {"brand_analysis": result}
+        new_context = InvestigationContext(investigation_id="temp")
+        new_context.shared_observations.append(
+            AgentObservation(
+                source_agent="BrandAgent",
+                content=f"Risk Score: {result.risk_score}. Reasoning: {result.reasoning}",
+                metadata={"authenticity_flags": result.authenticity_flags},
+            )
+        )
+        return {"brand_analysis": result, "context": new_context}
 
     def _get_fallback(self) -> BrandAnalysisResult:
         return BrandAnalysisResult(
@@ -254,7 +284,15 @@ class ReviewAgent(BaseSpecialistAgent):
     def _update_state(
         self, state: InvestigationState, result: ReviewAnalysisResult
     ) -> dict:
-        return {"review_analysis": result}
+        new_context = InvestigationContext(investigation_id="temp")
+        new_context.shared_observations.append(
+            AgentObservation(
+                source_agent="ReviewAgent",
+                content=f"Risk Score: {result.risk_score}. Reasoning: {result.reasoning}",
+                metadata={"fake_reviews_detected": result.fake_reviews_detected},
+            )
+        )
+        return {"review_analysis": result, "context": new_context}
 
     def _get_fallback(self) -> ReviewAnalysisResult:
         return ReviewAnalysisResult(

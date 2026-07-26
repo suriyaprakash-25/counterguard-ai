@@ -1,5 +1,6 @@
 from typing import TypedDict
 
+from backend.memory.models.domain import MemorySearchResult
 from backend.schemas.investigation import (
     AnalyzerResult,
     EvidenceResult,
@@ -54,6 +55,9 @@ class InvestigationState(TypedDict, total=False):
     catalog_data: CatalogOutput
     price_history: PriceOutput
     image_data: ImageOutput
+
+    # Long-Term Memory
+    historical_memories: list[MemorySearchResult]
 
     # Final AI synthesis
     coordinator_result: AIInvestigationResult

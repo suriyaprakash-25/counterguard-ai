@@ -43,7 +43,10 @@ Provide your response strictly as a JSON object matching the requested schema.
 
 
 def build_specialist_user_prompt(
-    listing_data: dict, evidence_data: dict, tool_data: dict = None
+    listing_data: dict,
+    evidence_data: dict,
+    tool_data: dict = None,
+    memories: list = None,
 ) -> str:
     prompt = f"""
 Please analyze the following data within your specialized domain:
@@ -58,6 +61,11 @@ Please analyze the following data within your specialized domain:
         prompt += f"""
 # External Tool Data
 {json.dumps(tool_data, indent=2)}
+"""
+    if memories:
+        prompt += f"""
+# Historical Memories (Past Investigations)
+{json.dumps([m.model_dump() for m in memories], indent=2, default=str)}
 """
 
     prompt += "\nBased on this data, provide your structured JSON evaluation.\n"

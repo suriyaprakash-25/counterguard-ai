@@ -157,6 +157,15 @@ def build_graph() -> StateGraph:  # noqa: C901
 
         return {}
 
+    def node_alert(state: InvestigationState):
+        from backend.automation.alerts.alert_service import AlertService
+
+        alert_service = AlertService()
+        alert_service.evaluate_investigation(
+            state.get("context"), state.get("coordinator_result")
+        )
+        return {}
+
     # -- Node Wrappers for Legacy Agents --
     def node_scrape(state: InvestigationState):
         result = scraper.scrape(state["request"].listing_url)
@@ -187,11 +196,17 @@ def build_graph() -> StateGraph:  # noqa: C901
 
     # -- Parallel Routing Function --
     def route_to_specialists(state: InvestigationState) -> List[str]:
-        plan = state.get("planning_result")
-        if plan and plan.selected_specialists:
-            selected = plan.selected_specialists
+        # Sprint 14: Use InvestigationPlan if provided
+        inv_plan = state.get("investigation_plan")
+        if inv_plan and inv_plan.tasks:
+            selected = [task.agent_name for task in inv_plan.tasks]
         else:
-            selected = ["PriceAgent", "SellerAgent", "BrandAgent", "ReviewAgent"]
+            # Fallback to legacy planner
+            plan = state.get("planning_result")
+            if plan and plan.selected_specialists:
+                selected = plan.selected_specialists
+            else:
+                selected = ["PriceAgent", "SellerAgent", "BrandAgent", "ReviewAgent"]
 
         node_map = {
             "PriceAgent": "price_agent",
@@ -221,6 +236,7 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_node("coordinator", coordinator_agent.run)
     graph.add_node("reporter", node_report)
     graph.add_node("save_memory", node_save_memory_and_graph)
+    graph.add_node("alert", node_alert)
 
     # Wire Edges
     graph.set_entry_point("scraper")
@@ -239,6 +255,7 @@ def build_graph() -> StateGraph:  # noqa: C901
 
     graph.add_edge("coordinator", "reporter")
     graph.add_edge("reporter", "save_memory")
-    graph.add_edge("save_memory", END)
+    graph.add_edge("save_memory", "alert")
+    graph.add_edge("alert", END)
 
     return graph

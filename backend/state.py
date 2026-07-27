@@ -57,6 +57,11 @@ class InvestigationState(TypedDict, total=False):
     risk: RiskAssessment
     planning_result: PlanningResult
 
+    # -- SPRINT 14: AUTOMATION --
+    from backend.automation.models.domain import InvestigationPlan
+
+    investigation_plan: InvestigationPlan
+
     # -- SPRINT 12: COLLABORATIVE BLACKBOARD --
     context: Annotated[InvestigationContext, merge_context]
     workspaces: Dict[str, AgentWorkspace]  # Maps agent name to their workspace

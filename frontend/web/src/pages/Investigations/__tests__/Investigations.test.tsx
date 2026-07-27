@@ -6,6 +6,17 @@ import { BrowserRouter } from "react-router-dom";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import Investigations from "../index";
 
+vi.mock("../../../features/auth/AuthContext", () => ({
+  useAuth: vi.fn(() => ({
+    user: { id: "1", name: "Test User", role: "admin" },
+    isAuthenticated: true,
+  })),
+  AuthProvider: ({ children }: any) => children,
+}));
+
+// Mock the API layer
+vi.mock("../../../shared/api/apiClient");
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });

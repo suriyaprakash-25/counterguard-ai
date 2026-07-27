@@ -7,6 +7,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import Dashboard from "../index";
 // Removed service import
 
+vi.mock("../../features/auth/AuthContext", () => ({
+  useAuth: vi.fn(() => ({
+    user: { id: "1", name: "Test User", role: "admin" },
+    isAuthenticated: true,
+  })),
+  AuthProvider: ({ children }: any) => children,
+}));
+
 // Mock the Recharts components to prevent SVG layout errors in JSDOM
 vi.mock("recharts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("recharts")>();

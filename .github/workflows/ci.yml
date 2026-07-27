@@ -68,5 +68,4 @@ jobs:
       run: echo "Run Pytest here"
 
     - name: Docker Build Test
-      working-directory: .
-      run: docker build -t counterguard-backend -f backend/Dockerfile .
+      run: docker build -t counterguard-backend -f Dockerfile .

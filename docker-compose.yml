@@ -40,3 +40,10 @@ services:
       - NEO4J_AUTH=neo4j/password
     volumes:
       - ./data/neo4j:/data
+
+  landing:
+    build:
+      context: ./frontend/landing
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8080:80"

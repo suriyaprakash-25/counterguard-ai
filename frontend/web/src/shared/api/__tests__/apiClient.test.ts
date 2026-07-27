@@ -43,7 +43,7 @@ describe('API Interceptors', () => {
     });
 
     it('handles 401 Unauthorized', async () => {
-      const error = { message: 'Unauthorized', response: { status: 401 } } as any;
+      const error = { message: 'Unauthorized', response: { status: 401 }, config: {} } as any;
       await expect(errorInterceptor(error)).rejects.toThrow(UnauthorizedError);
     });
 

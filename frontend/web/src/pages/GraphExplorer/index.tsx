@@ -2,7 +2,7 @@ import { useState } from "react";
 import { PageHeader } from "../../components/common/PageHeader";
 import { LoadingSkeleton } from "../../components/common/LoadingSkeleton";
 import { ErrorState } from "../../components/common/ErrorState";
-import { useGraphData } from "./hooks/useGraph";
+import { useGraph } from "./hooks/useGraph";
 import { GraphCanvas } from "../../components/graph/GraphCanvas";
 import { GraphToolbar } from "./components/GraphToolbar";
 import { NodeInspector } from "./components/NodeInspector";
@@ -11,7 +11,7 @@ export default function GraphExplorer() {
   const [layout, setLayout] = useState("cose");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  const { data, isLoading, isError, refetch } = useGraphData();
+  const { data, isLoading, isError, refetch } = useGraph();
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] pb-4">

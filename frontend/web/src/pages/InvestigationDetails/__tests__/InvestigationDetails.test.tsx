@@ -3,8 +3,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import InvestigationDetails from "../index";
-import { investigationService } from "../../../services/investigations.service";
-import { MOCK_WORKSPACE_DETAILS } from "../../../services/investigations.mock";
 
 vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router-dom")>();
@@ -13,12 +11,6 @@ vi.mock("react-router-dom", async (importOriginal) => {
     useParams: () => ({ id: "INV-9001" }),
   };
 });
-
-vi.mock("../../../services/investigations.service", () => ({
-  investigationService: {
-    getInvestigationDetails: vi.fn().mockResolvedValue(null),
-  }
-}));
 
 describe("Investigation Workspace Page", () => {
   let queryClient: QueryClient;
@@ -41,8 +33,12 @@ describe("Investigation Workspace Page", () => {
       </QueryClientProvider>
     );
 
+  it("renders back button", () => {
+    renderPage();
+    expect(screen.getByText("Back to Investigations")).toBeInTheDocument();
+  });
+
   it("renders workspace sections with data", async () => {
-    vi.mocked(investigationService.getInvestigationDetails).mockResolvedValue(MOCK_WORKSPACE_DETAILS);
     renderPage();
 
     await waitFor(() => {

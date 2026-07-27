@@ -1,5 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useInvestigation } from "../../hooks/useInvestigations";
+import { useRealtime } from "../../shared/realtime";
+import { useRealtimeSync } from "../../hooks/useRealtimeSync";
 import { Button } from "../../components/common/Button";
 import { Badge } from "../../components/common/Badge";
 import { LoadingSkeleton } from "../../components/common/LoadingSkeleton";
@@ -19,7 +21,15 @@ import {
 export default function InvestigationDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data, isLoading, isError, refetch } = useInvestigation(id || "");
+
+  // 1. Initialize Realtime Stream
+  const { isConnected } = useRealtime(id || '');
+
+  // 2. Synchronize Stream to TanStack Query Cache
+  useRealtimeSync(id || '');
+
+  // 3. Fetch Investigation Data (Polling disabled if streaming is connected)
+  const { data, isLoading, isError, refetch } = useInvestigation(id || '', isConnected);
 
   if (isLoading) {
     return (
@@ -101,7 +111,7 @@ export default function InvestigationDetails() {
 
         {/* SECTION 5 & 6: Graph and Memory Context */}
         <section className="grid gap-8 lg:grid-cols-2">
-          <GraphIntelligencePreview nodes={data.graphPreview} />
+          <GraphIntelligencePreview id={data.id} />
           <MemoryContextCard memory={data.memoryContext} />
         </section>
 
@@ -112,7 +122,7 @@ export default function InvestigationDetails() {
 
         {/* SECTION 8 & 9: Explainability & Recommendations */}
         <section>
-          <ExplainabilityAndRecs data={data} />
+          <ExplainabilityAndRecs id={data.id} fallbackData={data} />
         </section>
 
         {/* SECTION 10: Agent Activity */}

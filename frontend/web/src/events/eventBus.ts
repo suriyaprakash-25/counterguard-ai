@@ -1,24 +1,41 @@
-type EventCallback<T = any> = (payload: T) => void;
+import { InvestigationCompletedPayload } from './investigation.events';
+import { AlertCreatedPayload } from './alert.events';
+import { RealtimeEvent } from '../shared/realtime/events';
+
+export interface AppEventMap {
+  'investigation:created': { id: string };
+  'investigation:updated': { id: string };
+  'investigation:completed': InvestigationCompletedPayload;
+  'investigation:consensus_reached': { id: string };
+  'alert:created': AlertCreatedPayload;
+  'alert:acknowledged': { alertId: string };
+  'alert:dismissed': { alertId: string };
+  // Realtime Streaming Events
+  'stream:event': RealtimeEvent;
+  // Auth Events
+  'auth:forced_logout': void;
+}
+
+type EventCallback<K extends keyof AppEventMap> = (payload: AppEventMap[K]) => void;
 
 class EventBus {
-  private listeners: Map<string, EventCallback[]>;
+  private listeners: Map<keyof AppEventMap, EventCallback<any>[]>;
 
   constructor() {
     this.listeners = new Map();
   }
 
-  public subscribe<T>(event: string, callback: EventCallback<T>): () => void {
+  public subscribe<K extends keyof AppEventMap>(event: K, callback: EventCallback<K>): () => void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
 
     this.listeners.get(event)!.push(callback);
 
-    // Return unsubscribe function
     return () => this.unsubscribe(event, callback);
   }
 
-  public unsubscribe<T>(event: string, callback: EventCallback<T>): void {
+  public unsubscribe<K extends keyof AppEventMap>(event: K, callback: EventCallback<K>): void {
     if (!this.listeners.has(event)) return;
 
     const callbacks = this.listeners.get(event)!.filter(cb => cb !== callback);
@@ -29,11 +46,9 @@ class EventBus {
     }
   }
 
-  public publish<T>(event: string, payload: T): void {
+  public publish<K extends keyof AppEventMap>(event: K, payload: AppEventMap[K]): void {
     if (!this.listeners.has(event)) return;
 
-    // Use setTimeout to ensure event handlers don't block the caller
-    // and don't cause React rendering issues if they update state
     setTimeout(() => {
       this.listeners.get(event)!.forEach(callback => {
         try {
@@ -50,5 +65,4 @@ class EventBus {
   }
 }
 
-// Export singleton instance
 export const eventBus = new EventBus();

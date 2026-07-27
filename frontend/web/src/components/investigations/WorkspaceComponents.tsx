@@ -113,27 +113,37 @@ export function EvidenceSection({ evidence }: { evidence: EvidenceItem[] }) {
 }
 
 // --- 5. Graph Intelligence ---
-export function GraphIntelligencePreview({ nodes }: { nodes: GraphNodePreview[] }) {
+import { useInvestigationGraph, useInvestigationReasoning } from "../../hooks/useInvestigations";
+import { GraphCanvas } from "../graph/GraphCanvas";
+import { GraphMapper } from "../../pages/GraphExplorer/services/graph.mapper";
+import { memo } from "react";
+
+const GraphIntelligencePreviewComponent = ({ id }: { id: string }) => {
+  const { data, isLoading } = useInvestigationGraph(id);
+
   return (
-    <Card>
+    <Card className="flex flex-col h-[500px]">
       <CardHeader>
         <CardTitle>Graph Intelligence</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="bg-slate-50 rounded-lg border border-border border-dashed p-8 text-center flex flex-col items-center">
-          <div className="flex flex-wrap justify-center gap-3 mb-4">
-            {nodes.map(node => (
-              <Badge key={node.id} variant="default" className="px-3 py-1">
-                {node.label} ({node.type})
-              </Badge>
-            ))}
+      <CardContent className="flex-1 p-0 overflow-hidden relative border-t border-border">
+        {isLoading ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-50">
+            <span className="text-sm text-muted animate-pulse">Loading GraphRAG data...</span>
           </div>
-          <p className="text-sm text-muted">Placeholder for interactive Cytoscape GraphRAG visualization.</p>
-        </div>
+        ) : data ? (
+          <GraphCanvas data={GraphMapper.toGraphData(data)} onNodeClick={() => {}} />
+        ) : (
+          <div className="bg-slate-50 h-full w-full flex items-center justify-center text-muted text-sm border-dashed">
+            Graph data unavailable
+          </div>
+        )}
       </CardContent>
     </Card>
   );
-}
+};
+
+export const GraphIntelligencePreview = memo(GraphIntelligencePreviewComponent);
 
 // --- 6. Memory Context ---
 export function MemoryContextCard({ memory }: { memory: MemoryContext }) {
@@ -201,7 +211,21 @@ export function ConsensusCard({ consensus }: { consensus: ConsensusDetails }) {
 }
 
 // --- 8. Explainability & 9. Recommendations ---
-export function ExplainabilityAndRecs({ data }: { data: InvestigationWorkspaceDetails }) {
+export function ExplainabilityAndRecs({ id, fallbackData }: { id: string; fallbackData?: InvestigationWorkspaceDetails }) {
+  const { data: reasoning, isLoading } = useInvestigationReasoning(id);
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="h-48 animate-pulse bg-slate-50" />
+        <Card className="h-48 animate-pulse bg-slate-50" />
+      </div>
+    );
+  }
+
+  const expData = reasoning || fallbackData?.explainability || { reasoning: "Awaiting analysis...", supportingEvidenceIds: [] };
+  const recData = reasoning?.recommendations || fallbackData?.recommendations || [];
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
@@ -209,17 +233,22 @@ export function ExplainabilityAndRecs({ data }: { data: InvestigationWorkspaceDe
           <CardTitle>Explainability</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-slate-700 leading-relaxed">
-            {data.explainability.reasoning}
+          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+            {expData.reasoning || expData.summary || "No reasoning available yet."}
           </p>
-          <div className="mt-4 pt-4 border-t border-border">
-            <span className="text-xs font-semibold text-muted uppercase">Supporting Evidence IDs</span>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {data.explainability.supportingEvidenceIds.map(id => (
-                <Badge key={id} variant="outline" className="font-mono">{id}</Badge>
-              ))}
+          {(expData.supportingEvidenceIds?.length > 0 || expData.citations?.length > 0) && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <span className="text-xs font-semibold text-muted uppercase">Citations & Evidence</span>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {(expData.supportingEvidenceIds || []).map((evId: string) => (
+                  <Badge key={evId} variant="outline" className="font-mono">{evId}</Badge>
+                ))}
+                {(expData.citations || []).map((cite: string) => (
+                  <Badge key={`cite-${cite}`} variant="secondary" className="font-mono">{cite}</Badge>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
       <Card>
@@ -228,12 +257,13 @@ export function ExplainabilityAndRecs({ data }: { data: InvestigationWorkspaceDe
         </CardHeader>
         <CardContent>
           <ul className="space-y-3">
-            {data.recommendations.map((rec, idx) => (
+            {recData.map((rec: string, idx: number) => (
               <li key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-border">
                 <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                 <span className="text-sm text-slate-800">{rec}</span>
               </li>
             ))}
+            {recData.length === 0 && <li className="text-sm text-muted p-3">No recommendations available yet.</li>}
           </ul>
         </CardContent>
       </Card>

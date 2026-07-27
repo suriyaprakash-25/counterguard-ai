@@ -1,9 +1,11 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
+import { server } from "../../../mocks/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import Dashboard from "../index";
-import { dashboardService } from "../../../services/dashboard";
+// Removed service import
 
 // Mock the Recharts components to prevent SVG layout errors in JSDOM
 vi.mock("recharts", async (importOriginal) => {
@@ -16,26 +18,7 @@ vi.mock("recharts", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../services/dashboard", () => ({
-  dashboardService: {
-    getSummary: vi.fn().mockResolvedValue({
-      activeInvestigations: 142,
-      activeAlerts: 23,
-      highRiskSellers: 89,
-      fraudRingsDetected: 12,
-    }),
-    getRecentInvestigations: vi.fn().mockResolvedValue([
-      { id: "INV-8932", name: "Suspicious iPhone 15 Pro Batch", marketplace: "Amazon", status: "in_progress", riskScore: 88, createdAt: "2026-07-27T08:15:00Z" }
-    ]),
-    getRecentAlerts: vi.fn().mockResolvedValue([]),
-    getMarketplaceMetrics: vi.fn().mockResolvedValue([]),
-    getRiskTrend: vi.fn().mockResolvedValue([]),
-    getSystemHealth: vi.fn().mockResolvedValue({
-      fastapi: "healthy", langgraph: "healthy", sqlite: "healthy", neo4j: "healthy", chromadb: "warning", graphrag: "healthy", automation: "healthy"
-    }),
-    getFraudNodePreview: vi.fn().mockResolvedValue([]),
-  }
-}));
+// MSW handles requests now
 
 describe("Dashboard Page", () => {
   let queryClient: QueryClient;
@@ -84,7 +67,9 @@ describe("Dashboard Page", () => {
   });
 
   it("handles empty state in investigations", async () => {
-    vi.spyOn(dashboardService, "getRecentInvestigations").mockResolvedValueOnce([]);
+    server.use(
+      http.get("*/api/v1/investigations", () => HttpResponse.json({ data: [] }))
+    );
     renderDashboard();
     await waitFor(() => {
       expect(screen.getByText("No Investigations Found")).toBeInTheDocument();

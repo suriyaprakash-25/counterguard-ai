@@ -1,21 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { alertsService } from "../services/alerts.service";
-import { usePolling } from "../../../hooks/usePolling";
+import { AlertsRepository } from "../services/alerts.repository";
 
 export const useAlerts = () => {
-  const { isPolling, pollingInterval } = usePolling(30000); // 30s polling
-
   return useQuery({
     queryKey: ["alerts", "list"],
-    queryFn: alertsService.getAlerts,
-    refetchInterval: isPolling ? pollingInterval : false
+    queryFn: AlertsRepository.getAlerts
   });
 };
 
-export const useAlertDetails = (id: string | null) => {
+export const useAlertDetails = (id: string) => {
   return useQuery({
     queryKey: ["alerts", "details", id],
-    queryFn: () => alertsService.getAlertDetails(id!),
+    queryFn: () => AlertsRepository.getAlertDetails(id),
     enabled: !!id
   });
 };

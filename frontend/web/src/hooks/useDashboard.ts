@@ -1,51 +1,52 @@
 import { useQuery } from "@tanstack/react-query";
-import { dashboardService } from "../services/dashboard";
+import { DashboardRepository } from "../services/dashboard.repository";
 
 export const useDashboardSummary = () => {
   return useQuery({
     queryKey: ["dashboard", "summary"],
-    queryFn: dashboardService.getSummary,
+    queryFn: DashboardRepository.getSummary,
   });
 };
 
 export const useRecentInvestigations = () => {
   return useQuery({
-    queryKey: ["dashboard", "recent-investigations"],
-    queryFn: dashboardService.getRecentInvestigations,
+    queryKey: ["dashboard", "investigations"],
+    queryFn: DashboardRepository.getRecentInvestigations,
   });
 };
 
 export const useRecentAlerts = () => {
   return useQuery({
-    queryKey: ["dashboard", "recent-alerts"],
-    queryFn: dashboardService.getRecentAlerts,
+    queryKey: ["dashboard", "alerts"],
+    queryFn: DashboardRepository.getRecentAlerts,
   });
 };
 
 export const useMarketplaceMetrics = () => {
   return useQuery({
-    queryKey: ["dashboard", "marketplace-metrics"],
-    queryFn: dashboardService.getMarketplaceMetrics,
+    queryKey: ["dashboard", "marketplaces"],
+    queryFn: DashboardRepository.getMarketplaceMetrics,
   });
 };
 
 export const useRiskTrend = () => {
   return useQuery({
-    queryKey: ["dashboard", "risk-trend"],
-    queryFn: dashboardService.getRiskTrend,
+    queryKey: ["dashboard", "risk"],
+    queryFn: DashboardRepository.getRiskTrend,
   });
 };
 
 export const useSystemHealth = () => {
   return useQuery({
-    queryKey: ["dashboard", "system-health"],
-    queryFn: dashboardService.getSystemHealth,
+    queryKey: ["dashboard", "health"],
+    queryFn: DashboardRepository.getSystemHealth,
+    refetchInterval: 30000, // Poll every 30s
   });
 };
 
 export const useFraudNodePreview = () => {
   return useQuery({
-    queryKey: ["dashboard", "fraud-node-preview"],
-    queryFn: dashboardService.getFraudNodePreview,
+    queryKey: ["dashboard", "fraud-preview"],
+    queryFn: DashboardRepository.getFraudNodePreview,
   });
 };

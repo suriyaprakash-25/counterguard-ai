@@ -1,27 +1,19 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
+import { server } from "../../../mocks/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import Investigations from "../index";
-import { investigationService } from "../../../services/investigations.service";
-import { MOCK_INVESTIGATIONS } from "../../../services/investigations.mock";
 
-vi.mock("../../../services/investigations.service", () => ({
-  investigationService: {
-    getInvestigations: vi.fn().mockResolvedValue([]),
-  }
-}));
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
 
 describe("Investigations List Page", () => {
-  let queryClient: QueryClient;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-      },
-    });
+    queryClient.clear();
   });
 
   const renderPage = () =>
@@ -36,9 +28,15 @@ describe("Investigations List Page", () => {
   it("renders the header", () => {
     renderPage();
     expect(screen.getByText("Investigations")).toBeInTheDocument();
+    expect(
+      screen.getByText("Manage and monitor autonomous investigations across all marketplaces.")
+    ).toBeInTheDocument();
   });
 
   it("renders empty state when no data", async () => {
+    server.use(
+      http.get("*/api/v1/investigations", () => HttpResponse.json({ data: [] }))
+    );
     renderPage();
     await waitFor(() => {
       expect(screen.getByText("No Investigations Found")).toBeInTheDocument();
@@ -46,11 +44,10 @@ describe("Investigations List Page", () => {
   });
 
   it("renders table with data", async () => {
-    vi.mocked(investigationService.getInvestigations).mockResolvedValue(MOCK_INVESTIGATIONS);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText("INV-9001")).toBeInTheDocument();
       expect(screen.getByText("Suspicious iPhone 15 Pro Batch")).toBeInTheDocument();
+      expect(screen.getByText("Counterfeit Nike Air Max")).toBeInTheDocument();
     });
   });
 });

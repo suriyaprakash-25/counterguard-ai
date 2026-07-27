@@ -1,24 +1,39 @@
 import { useNavigate } from "react-router-dom";
 import { useInvestigations } from "../../hooks/useInvestigations";
+import { useState } from "react";
 import { PageHeader } from "../../components/common/PageHeader";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/common/Table";
 import { Badge } from "../../components/common/Badge";
 import { LoadingSkeleton } from "../../components/common/LoadingSkeleton";
 import { ErrorState } from "../../components/common/ErrorState";
 import { EmptyState } from "../../components/common/EmptyState";
-import { Search } from "lucide-react";
+import { Search, Plus } from "lucide-react";
+import { Button } from "../../components/common/Button";
 import type { InvestigationSummary } from "../../types/investigations";
+import { CreateInvestigationDialog } from "./CreateInvestigationDialog";
+import { RoleGuard } from "../../features/auth/components/RoleGuard";
 
 export default function Investigations() {
-  const { data, isLoading, isError, refetch } = useInvestigations();
+  // TODO: Add pagination and filter state management
+  const { data, isLoading, isError, refetch } = useInvestigations(1, {});
   const navigate = useNavigate();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   return (
     <div className="space-y-6 pb-12">
-      <PageHeader
-        title="Investigations"
-        description="Manage and monitor autonomous investigations across all marketplaces."
-      />
+      <div className="flex items-start justify-between">
+        <PageHeader
+          title="Investigations"
+          description="Manage and monitor autonomous investigations across all marketplaces."
+        />
+        <RoleGuard require="Investigator">
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> New Investigation
+          </Button>
+        </RoleGuard>
+      </div>
+
+      <CreateInvestigationDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} />
 
       <div className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
         {isLoading ? (

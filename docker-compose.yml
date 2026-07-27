@@ -12,16 +12,31 @@ services:
     environment:
       - ENVIRONMENT=development
       - CORS_ORIGINS=http://localhost:8501
+      - NEO4J_URI=neo4j://neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=password
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - neo4j
 
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend/web
+      dockerfile: Dockerfile.prod
     ports:
-      - "8501:8501"
-    volumes:
-      - ./frontend:/app
+      - "80:80"
     environment:
-      - API_URL=http://backend:8000
+      - VITE_API_BASE_URL=/api
+      - VITE_REALTIME_PROVIDER=sse
     depends_on:
       - backend
+
+  neo4j:
+    image: neo4j:5
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/password
+    volumes:
+      - ./data/neo4j:/data

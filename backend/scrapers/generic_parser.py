@@ -20,7 +20,6 @@ class GenericParser(BaseParser):
         """
         soup = BeautifulSoup(html, "lxml")
 
-        # Detection logic is handled by Factory, but fallback available
         detector = MarketplaceDetector()
         detected = detector.detect(url)
         marketplace = (
@@ -34,6 +33,7 @@ class GenericParser(BaseParser):
         seller_rating = self._extract_seller_rating(soup)
         brand = self._extract_brand(soup)
         images_count = self._extract_images_count(soup)
+        image_url = self._extract_image_url(soup)
         description = self._extract_description(soup)
         availability = self._extract_availability(soup)
         warranty = self._extract_warranty(soup)
@@ -49,6 +49,7 @@ class GenericParser(BaseParser):
             seller_rating=seller_rating,
             brand=brand,
             images_count=images_count,
+            image_url=image_url,
             description=description,
             availability=availability,
             warranty_info=warranty,
@@ -56,6 +57,7 @@ class GenericParser(BaseParser):
             currency=currency,
             shipping=shipping,
             category=category,
+            data_source="live_retrieval",
         )
 
     def _extract_marketplace(self, url: str) -> str:
@@ -163,6 +165,27 @@ class GenericParser(BaseParser):
             except ValueError:
                 count += 1
         return count
+
+    def _extract_image_url(self, soup: BeautifulSoup) -> Optional[str]:
+        og_img = soup.find("meta", property="og:image")
+        if og_img and og_img.get("content"):
+            return og_img["content"].strip()
+
+        meta_img = soup.find("meta", attrs={"name": "image"})
+        if meta_img and meta_img.get("content"):
+            return meta_img["content"].strip()
+
+        img_tag = soup.find(
+            "img", id=re.compile(r"main|product|landing|hero", re.IGNORECASE)
+        )
+        if img_tag and img_tag.get("src"):
+            return img_tag["src"].strip()
+
+        for img in soup.find_all("img"):
+            src = img.get("src", "").strip()
+            if src and (src.startswith("http://") or src.startswith("https://")):
+                return src
+        return None
 
     def _extract_description(self, soup: BeautifulSoup) -> Optional[str]:
         desc_div = soup.find(

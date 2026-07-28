@@ -1,11 +1,48 @@
+from typing import Optional
+
 from backend.schemas.investigation import AnalyzerResult, EvidenceResult
+from backend.schemas.scraping import ScrapingResult
 
 
 class EvidenceCollector:
-    def collect(self, analysis: AnalyzerResult) -> EvidenceResult:
+    def collect(
+        self,
+        analysis: AnalyzerResult,
+        scraping_result: Optional[ScrapingResult] = None,
+    ) -> EvidenceResult:
         """
-        Generates supporting evidence based on the analyzer output.
+        Generates supporting evidence based on analyzer output and scraping result.
+        Gated on data_source check: when data_source is 'fallback_demo_data',
+        all evidence_summary fields report status='Unavailable' with reason='No live data retrieved'.
         """
+        data_source = (
+            scraping_result.listing.data_source
+            if scraping_result and scraping_result.listing
+            else "live_retrieval"
+        )
+
+        if data_source == "fallback_demo_data":
+            return EvidenceResult(
+                structured_evidence={
+                    "price": {
+                        "status": "Unavailable",
+                        "reason": "No live data retrieved",
+                    },
+                    "seller": {
+                        "status": "Unavailable",
+                        "reason": "No live data retrieved",
+                    },
+                    "images": {
+                        "status": "Unavailable",
+                        "reason": "No live data retrieved",
+                    },
+                    "warranty": {
+                        "status": "Unavailable",
+                        "reason": "No live data retrieved",
+                    },
+                }
+            )
+
         structured_evidence = {}
 
         # Price

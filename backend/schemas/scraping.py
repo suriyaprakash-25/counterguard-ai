@@ -10,6 +10,7 @@ class ParsedListing(BaseModel):
     seller_rating: Optional[float] = None
     brand: Optional[str] = None
     images_count: int = 0
+    image_url: Optional[str] = None
     description: Optional[str] = None
     availability: Optional[str] = None
     warranty_info: Optional[str] = None

@@ -25,19 +25,40 @@ class AnalyzerAgent:
 
     def _evaluate_risk_signals(self, listing) -> list[str]:
         risk_signals = []
-        if listing.price is not None and listing.price < Thresholds.PRICE_MIN:
+        title_lower = (listing.title or "").lower()
+        desc_lower = (listing.description or "").lower()
+        seller_lower = (listing.seller_name or "").lower()
+
+        is_replica = any(
+            w in title_lower or w in desc_lower or w in seller_lower
+            for w in ["replica", "clone", "fake", "copy", "99% new"]
+        )
+
+        if listing.price is not None and (listing.price < 50.0 or is_replica):
             risk_signals.append("very_low_price")
+
         if (
-            listing.seller_rating is not None
-            and listing.seller_rating < Thresholds.SELLER_RATING_MIN
+            (
+                listing.seller_rating is not None
+                and listing.seller_rating < Thresholds.SELLER_RATING_MIN
+            )
+            or "replica" in seller_lower
+            or "outlet" in seller_lower
         ):
             risk_signals.append("poor_seller_rating")
+
         if not listing.seller_name or listing.seller_name == "Unknown Seller":
             risk_signals.append("missing_seller")
-        if not listing.warranty_info:
+
+        if (
+            not listing.warranty_info
+            or "no warranty" in (listing.warranty_info or "").lower()
+        ):
             risk_signals.append("no_warranty")
-        if not listing.brand:
+
+        if not listing.brand or "replica" in (listing.brand or "").lower():
             risk_signals.append("unknown_brand")
+
         if listing.images_count < Thresholds.MIN_IMAGES:
             risk_signals.append("few_images")
 

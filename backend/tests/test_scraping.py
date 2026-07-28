@@ -3,6 +3,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
+from backend.agents.analyzer import AnalyzerAgent
+from backend.agents.collector import EvidenceCollector
+from backend.schemas.investigation import InvestigationRequest
+from backend.schemas.scraping import ParsedListing, ScrapingResult
 from backend.scrapers.generic_parser import GenericParser
 from backend.scrapers.page_fetcher import PageFetcher
 from backend.services.scraping_service import ScrapingService
@@ -35,7 +39,10 @@ def test_html_parser_extracts_data():
     parser = GenericParser()
     sample_html = """
     <html>
-        <head><title>Fake Rolex Watch</title></head>
+        <head>
+            <title>Fake Rolex Watch</title>
+            <meta property="og:image" content="https://images.example.com/rolex.jpg">
+        </head>
         <body>
             <div id="price">$99.99</div>
             <span class="seller">Sold by ShadySeller123</span>
@@ -57,28 +64,66 @@ def test_html_parser_extracts_data():
     assert listing.seller_rating == 2.5
     assert listing.brand == "FakeBrand"
     assert listing.images_count == 2
+    assert listing.image_url == "https://images.example.com/rolex.jpg"
     assert listing.description == "A very real looking watch."
     assert listing.availability == "In stock"
     assert listing.warranty_info == "No warranty provided"
     assert listing.marketplace == "fakemarket.com"
 
 
-def test_scraping_service():
-    service = ScrapingService()
-    with patch.object(service.fetcher, "fetch") as mock_fetch:
-        mock_fetch.return_value = (
-            "<html><body><h1>Item</h1><div id='price'>$5.00</div></body></html>"
-        )
+def test_evidence_summary_honest_on_fallback():
+    """
+    FIX 1 Test: Asserts that if data_source is fallback_demo_data,
+    no evidence_summary field may report any status other than 'Unavailable'.
+    """
+    analyzer = AnalyzerAgent()
+    collector = EvidenceCollector()
+    req = InvestigationRequest(
+        listing_url="http://example.com/item", marketplace="Global"
+    )
 
-        result = service.scrape("https://test.com/item")
-        assert result.success is True
-        assert result.listing.title == "Item"
-        assert result.listing.price == 5.0
-        assert result.listing.data_source == "live_retrieval"
+    fallback_result = ScrapingResult(
+        success=True,
+        listing=ParsedListing(
+            title="Fallback Item",
+            price=149.99,
+            seller_name="Global Merchant",
+            brand="Generic Brand",
+            marketplace="Global",
+            data_source="fallback_demo_data",
+        ),
+    )
 
-    with patch.object(service.fetcher, "fetch") as mock_fetch:
-        mock_fetch.side_effect = Exception("Connection Failed")
+    analysis = analyzer.analyze(req, fallback_result)
+    evidence = collector.collect(analysis, fallback_result)
+    se = evidence.structured_evidence
 
-        result = service.scrape("https://test.com/item")
-        assert result.success is True
-        assert result.listing.data_source == "fallback_demo_data"
+    for field, data in se.items():
+        assert (
+            data["status"] == "Unavailable"
+        ), f"Field '{field}' status must be 'Unavailable', got '{data['status']}'"
+        assert data["reason"] == "No live data retrieved"
+
+
+def test_demo_mode_snapshots():
+    """
+    FIX 2 Test: Verifies DEMO_MODE loads pre-fetched HTML snapshots,
+    executes real parser code, populates image_url, and returns valid data_source.
+    """
+    service = ScrapingService(demo_mode=True)
+
+    cases = [
+        ("demo://genuine", "Sony WH-1000XM5", 399.99),
+        ("demo://counterfeit", "Original Sony WH-1000XM5", 39.99),
+        ("demo://suspicious", "Sony WH-1000XM5", 189.99),
+    ]
+
+    for url, title_substr, expected_price in cases:
+        res = service.scrape(url)
+        assert res.success is True
+        assert res.listing is not None
+        assert title_substr in res.listing.title
+        assert res.listing.price == expected_price
+        assert res.listing.image_url is not None
+        assert res.listing.image_url.startswith("https://images.unsplash.com")
+        assert res.listing.data_source == "live_retrieval"

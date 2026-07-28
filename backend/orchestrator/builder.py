@@ -85,7 +85,11 @@ def build_graph() -> StateGraph:  # noqa: C901
         }
 
     def node_evidence(state: InvestigationState):
-        return {"evidence": collector.collect(state["analysis"])}
+        return {
+            "evidence": collector.collect(
+                state["analysis"], state.get("scraping_result")
+            )
+        }
 
     def node_risk(state: InvestigationState):
         return {"risk": assessor.assess(state["analysis"], state["evidence"])}

@@ -12,7 +12,9 @@ import {
   ConsensusCard,
   ExplainabilityAndRecs,
   AgentActivityTable,
-  ProviderHealthWidget
+  ProviderHealthWidget,
+  RiskContributionWidget,
+  InvestigationInsightsCard
 } from "../../components/investigations/WorkspaceComponents";
 import { ReplayModal } from "../../components/investigations/ReplayModal";
 import { AskCounterGuardWidget } from "../../components/investigations/AskCounterGuardWidget";
@@ -165,6 +167,12 @@ export function InvestigationDetailsPage() {
         {/* SECTION 2: Summary */}
         <section>
           <SummaryCard data={data} />
+        </section>
+
+        {/* SECTION 2.1: Risk Attribution & Insights */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RiskContributionWidget riskScore={data.riskScore} />
+          <InvestigationInsightsCard data={data} />
         </section>
 
         {/* SECTION 2.5: Ask CounterGuard Grounded Assistant */}

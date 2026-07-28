@@ -22,8 +22,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
-        title="CounterGuard Dashboard"
-        description="Autonomous Investigation & Intelligence Overview"
+        title="Cyber Intelligence Operations Center"
+        description="Real-time multi-agent swarm telemetry, threat detection, and risk metrics overview."
       >
         <Button variant="outline" size="sm" onClick={handleRefresh}>
           <RefreshCw className="mr-2 h-4 w-4" />

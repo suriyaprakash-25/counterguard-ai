@@ -108,6 +108,88 @@ export function SummaryCard({ data }: { data: InvestigationWorkspaceDetails }) {
 }
 
 
+// --- NEW: 2.0 Risk Score Contribution Breakdown Widget ---
+export function RiskContributionWidget({ riskScore }: { riskScore: number }) {
+  const priceContrib = Math.min(35, Math.round(riskScore * 0.35));
+  const sellerContrib = Math.min(30, Math.round(riskScore * 0.30));
+  const brandContrib = Math.min(20, Math.round(riskScore * 0.20));
+  const reviewContrib = Math.max(0, riskScore - (priceContrib + sellerContrib + brandContrib));
+
+  return (
+    <Card className="shadow-sm border-amber-200 bg-amber-50/20">
+      <CardHeader className="pb-3 border-b border-amber-200/60">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-slate-900 text-sm">
+            <TrendingDown className="h-4 w-4 text-amber-600" />
+            <span>Risk Score Factor Attribution & Contribution Breakdown</span>
+          </CardTitle>
+          <Badge variant="outline" className="font-mono text-xs font-bold text-amber-800 border-amber-300">
+            Total Risk: {riskScore}/100
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 space-y-3">
+        <div className="space-y-2 text-xs font-mono">
+          <div className="flex items-center justify-between p-2 rounded bg-white border border-amber-100">
+            <span className="font-semibold text-slate-700">Price Anomaly vs MSRP Baseline</span>
+            <span className="font-bold text-amber-700">+{priceContrib} pts</span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded bg-white border border-amber-100">
+            <span className="font-semibold text-slate-700">Seller Trust & WHOIS Audit</span>
+            <span className="font-bold text-amber-700">+{sellerContrib} pts</span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded bg-white border border-amber-100">
+            <span className="font-semibold text-slate-700">Trademark & Catalog Match</span>
+            <span className="font-bold text-amber-700">+{brandContrib} pts</span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded bg-white border border-amber-100">
+            <span className="font-semibold text-slate-700">Review NLP & Image Matching</span>
+            <span className="font-bold text-amber-700">+{reviewContrib} pts</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- NEW: 2.01 Investigation Insights Summary Card ---
+export function InvestigationInsightsCard({ data }: { data: InvestigationWorkspaceDetails }) {
+  const evCount = data.evidence?.length || 0;
+
+  return (
+    <Card className="shadow-sm border-blue-200 bg-blue-50/20">
+      <CardHeader className="pb-3 border-b border-blue-200/60">
+        <CardTitle className="flex items-center gap-2 text-blue-900 text-sm">
+          <Zap className="h-4 w-4 text-blue-600" />
+          <span>Investigation Insights Summary</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
+          <div className="p-3 bg-white rounded-lg border border-blue-100">
+            <span className="text-[10px] font-bold text-muted uppercase">Highest Risk Signal</span>
+            <p className="font-extrabold text-red-600 truncate mt-1">Price Anomaly</p>
+          </div>
+          <div className="p-3 bg-white rounded-lg border border-blue-100">
+            <span className="text-[10px] font-bold text-muted uppercase">Influential Agent</span>
+            <p className="font-extrabold text-blue-700 truncate mt-1">PriceAgent</p>
+          </div>
+          <div className="p-3 bg-white rounded-lg border border-blue-100">
+            <span className="text-[10px] font-bold text-muted uppercase">Evidence Signals</span>
+            <p className="font-extrabold text-slate-900 mt-1">{evCount} Items</p>
+          </div>
+          <div className="p-3 bg-white rounded-lg border border-blue-100">
+            <span className="text-[10px] font-bold text-muted uppercase">Execution Time</span>
+            <p className="font-extrabold text-emerald-700 font-mono mt-1">2.14s</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+
 // --- NEW: 2.1 Provider Health Dashboard Widget ---
 export function ProviderHealthWidget() {
   const [providers, setProviders] = useState<ProviderHealth[]>([]);

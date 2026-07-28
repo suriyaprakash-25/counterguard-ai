@@ -109,15 +109,40 @@ export function ReplayModal({ isOpen, onClose, agentActivity, investigationName,
         <div className="px-6 py-3 bg-slate-50 border-b border-border flex justify-between items-center text-xs">
           <div className="flex items-center gap-2">
             <button
+              onClick={() => {
+                if (currentStep > 0) setCurrentStep(prev => prev - 1);
+                setIsPlaying(false);
+              }}
+              disabled={currentStep <= 0}
+              className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-slate-700 hover:bg-slate-100 font-semibold disabled:opacity-40"
+              title="Step Backward"
+            >
+              Step Back
+            </button>
+
+            <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white font-bold hover:bg-primary-dark transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-white font-bold hover:bg-primary-dark transition-colors shadow-sm"
             >
               {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               <span>{isPlaying ? 'Pause' : currentStep >= steps.length - 1 ? 'Replay Completed' : 'Play Swarm'}</span>
             </button>
+
+            <button
+              onClick={() => {
+                if (currentStep < steps.length - 1) setCurrentStep(prev => prev + 1);
+                setIsPlaying(false);
+              }}
+              disabled={currentStep >= steps.length - 1}
+              className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-slate-700 hover:bg-slate-100 font-semibold disabled:opacity-40"
+              title="Step Forward"
+            >
+              Step Next
+            </button>
+
             <button
               onClick={handleReset}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface text-slate-700 hover:bg-slate-100 font-semibold"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface text-slate-700 hover:bg-slate-100 font-semibold ml-1"
             >
               <RotateCcw className="h-3.5 w-3.5" /> Restart
             </button>

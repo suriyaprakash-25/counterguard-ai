@@ -13,11 +13,14 @@ import type { InvestigationSummary } from "../../types/investigations";
 import { CreateInvestigationDialog } from "./CreateInvestigationDialog";
 import { RoleGuard } from "../../features/auth/components/RoleGuard";
 
+import { Scale } from "lucide-react";
+import { InvestigationComparisonModal } from "./InvestigationComparisonModal";
+
 export default function Investigations() {
-  // TODO: Add pagination and filter state management
   const { data, isLoading, isError, refetch } = useInvestigations(1, {});
   const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
 
   return (
     <div className="space-y-6 pb-12">
@@ -26,14 +29,28 @@ export default function Investigations() {
           title="Investigations"
           description="Manage and monitor autonomous investigations across all marketplaces."
         />
-        <RoleGuard require="Investigator">
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> New Investigation
-          </Button>
-        </RoleGuard>
+        <div className="flex gap-2">
+          {data && data.length >= 2 && (
+            <Button variant="outline" onClick={() => setIsCompareOpen(true)}>
+              <Scale className="mr-2 h-4 w-4" /> Compare Cases
+            </Button>
+          )}
+          <RoleGuard require="Investigator">
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> New Investigation
+            </Button>
+          </RoleGuard>
+        </div>
       </div>
 
       <CreateInvestigationDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} />
+      {data && (
+        <InvestigationComparisonModal
+          isOpen={isCompareOpen}
+          onClose={() => setIsCompareOpen(false)}
+          investigations={data}
+        />
+      )}
 
       <div className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
         {isLoading ? (

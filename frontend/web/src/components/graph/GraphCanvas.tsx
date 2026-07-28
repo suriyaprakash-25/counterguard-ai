@@ -53,13 +53,13 @@ export function GraphCanvas({ data, layoutName, onNodeSelect, selectedNodeId }: 
           if (type === "investigation") return "#8b5cf6"; // purple
           return "#94a3b8";                             // slate
         },
-        "label": "data(label)",
+        "label": (ele: any) => (ele.cy().zoom() < 0.65 ? "" : (ele.data("label") || "")),
         "color": "#0f172a",
         "text-valign": "bottom",
         "text-margin-y": 6,
         "font-size": "11px",
         "font-family": "ui-sans-serif, system-ui, -apple-system, sans-serif",
-        "font-weight": "700",
+        "font-weight": "bold",
         "text-outline-color": "#ffffff",
         "text-outline-width": 2,
         "text-wrap": "wrap",
@@ -80,7 +80,7 @@ export function GraphCanvas({ data, layoutName, onNodeSelect, selectedNodeId }: 
         "target-arrow-color": "#cbd5e1",
         "target-arrow-shape": "triangle",
         "curve-style": "bezier",
-        "label": "data(label)",
+        "label": (ele: any) => (ele.cy().zoom() < 0.65 ? "" : (ele.data("label") || "")),
         "font-size": "9px",
         "text-background-opacity": 0.9,
         "text-background-color": "#ffffff",
@@ -104,12 +104,6 @@ export function GraphCanvas({ data, layoutName, onNodeSelect, selectedNodeId }: 
       selector: ".faded",
       style: {
         "opacity": 0.15
-      }
-    },
-    {
-      selector: ".low-zoom label",
-      style: {
-        "label": ""
       }
     }
   ];

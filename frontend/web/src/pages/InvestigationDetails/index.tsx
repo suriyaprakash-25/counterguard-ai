@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useInvestigationDetails } from "../../hooks/useInvestigations";
 import {
@@ -13,13 +14,17 @@ import {
   AgentActivityTable,
   ProviderHealthWidget
 } from "../../components/investigations/WorkspaceComponents";
+import { ReplayModal } from "../../components/investigations/ReplayModal";
+import { AskCounterGuardWidget } from "../../components/investigations/AskCounterGuardWidget";
+import { ReportExportService } from "../../services/report_export_service";
 import { Button } from "../../components/common/Button";
 import { Badge } from "../../components/common/Badge";
-import { ArrowLeft, ExternalLink, RefreshCw, AlertCircle, ShieldAlert, Layers, Clock, Hash, Tag, Store } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, AlertCircle, ShieldAlert, Play, Clock, Hash, Tag, Store, FileText } from "lucide-react";
 
 export function InvestigationDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [isReplayOpen, setIsReplayOpen] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useInvestigationDetails(id || "");
 
@@ -57,6 +62,15 @@ export function InvestigationDetailsPage() {
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Replay Modal Component */}
+      <ReplayModal
+        isOpen={isReplayOpen}
+        onClose={() => setIsReplayOpen(false)}
+        agentActivity={data.agentActivity}
+        investigationName={titleDisplay}
+        riskScore={data.riskScore}
+      />
+
       {/* CYBER INTELLIGENCE CASE HEADER */}
       <div className="rounded-2xl border border-border bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 text-white shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -117,9 +131,20 @@ export function InvestigationDetailsPage() {
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white" onClick={() => window.print()}>
-                Export Case Report
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
+                onClick={() => setIsReplayOpen(true)}
+              >
+                <Play className="mr-1.5 h-4 w-4 text-primary-light" /> Replay Swarm
+              </Button>
+              <Button
+                variant="outline"
+                className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
+                onClick={() => ReportExportService.generatePrintableReport(data)}
+              >
+                <FileText className="mr-1.5 h-4 w-4" /> Export Report
               </Button>
               {data.listing_url && (
                 <Button className="bg-primary hover:bg-primary-dark text-white font-bold" onClick={() => window.open(data.listing_url, "_blank")}>
@@ -140,6 +165,11 @@ export function InvestigationDetailsPage() {
         {/* SECTION 2: Summary */}
         <section>
           <SummaryCard data={data} />
+        </section>
+
+        {/* SECTION 2.5: Ask CounterGuard Grounded Assistant */}
+        <section>
+          <AskCounterGuardWidget investigationId={data.id} />
         </section>
 
         {/* SECTION 3: Verified Recommended Genuine Options */}

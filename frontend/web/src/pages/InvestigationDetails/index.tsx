@@ -19,6 +19,7 @@ import {
 import { ReplayModal } from "../../components/investigations/ReplayModal";
 import { AskCounterGuardWidget } from "../../components/investigations/AskCounterGuardWidget";
 import { ReportExportService } from "../../services/report_export_service";
+import { ExecutionTracePanel } from "../../components/investigations/ExecutionTracePanel";
 import { Button } from "../../components/common/Button";
 import { Badge } from "../../components/common/Badge";
 import { ArrowLeft, ExternalLink, RefreshCw, AlertCircle, ShieldAlert, Play, Clock, Hash, Tag, Store, FileText } from "lucide-react";
@@ -219,6 +220,11 @@ export function InvestigationDetailsPage() {
         {/* SECTION 10: Agent Activity Log */}
         <section>
           <AgentActivityTable activities={data.agentActivity} />
+        </section>
+
+        {/* SECTION 11: Developer Execution Trace & Provider Telemetry */}
+        <section>
+          <ExecutionTracePanel activities={data.agentActivity} />
         </section>
       </div>
     </div>

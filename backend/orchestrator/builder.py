@@ -32,13 +32,13 @@ from backend.memory.services.memory_service import MemoryService
 from backend.memory.vector.chroma_store import ChromaMemoryStore
 from backend.services.scraping_service import ScrapingService
 from backend.state import InvestigationState
-from backend.tools.mocks import (
-    MockPriceVerificationTool,
-    MockProductCatalogTool,
-    MockReverseImageTool,
-    MockSellerReputationTool,
-    MockTrademarkTool,
-    MockWhoisTool,
+from backend.tools.live_tools import (
+    LivePriceVerificationTool,
+    LiveProductCatalogTool,
+    LiveReverseImageTool,
+    LiveSellerReputationTool,
+    LiveTrademarkTool,
+    LiveWhoisTool,
 )
 from backend.tools.registry import ToolRegistry
 
@@ -52,14 +52,14 @@ def build_graph() -> StateGraph:  # noqa: C901
     """
     graph = StateGraph(InvestigationState)
 
-    # Initialize tool registry
+    # Initialize tool registry with production Live Provider Adapters
     registry = ToolRegistry()
-    registry.register(MockPriceVerificationTool())
-    registry.register(MockWhoisTool())
-    registry.register(MockTrademarkTool())
-    registry.register(MockReverseImageTool())
-    registry.register(MockSellerReputationTool())
-    registry.register(MockProductCatalogTool())
+    registry.register(LivePriceVerificationTool())
+    registry.register(LiveWhoisTool())
+    registry.register(LiveTrademarkTool())
+    registry.register(LiveReverseImageTool())
+    registry.register(LiveSellerReputationTool())
+    registry.register(LiveProductCatalogTool())
 
     # Initialize memory subsystem
     investigation_repo = SQLiteInvestigationRepository()

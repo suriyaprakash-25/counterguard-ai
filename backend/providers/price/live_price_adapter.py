@@ -4,28 +4,23 @@ from typing import Any, Dict
 
 from backend.providers.base import BaseProviderAdapter
 from backend.services.product_canonicalizer import ProductCanonicalizer
+from backend.services.product_search_service import ProductSearchService
 
 logger = logging.getLogger(__name__)
 
 
 class LivePriceAdapter(BaseProviderAdapter):
     """
-    Production Live Price Baseline & MSRP Verification Adapter.
+    Evidence-Backed Production Live Price Intelligence Adapter (v2.1).
 
-    Calculates authentic MSRP baselines, historical price bounds, and percentage
-    deviations across verified retailer search catalogs.
+    Completely eliminates heuristic default floats ($249.99) and local lookup tables.
+    Aggregates real-time prices across Amazon, Best Buy, Walmart, Flipkart, and Brand Flagship Stores
+    via ProductSearchService.
     """
 
-    KNOWN_MSRP_CATALOG: Dict[str, float] = {
-        "sony wh-1000xm5": 399.99,
-        "sony wf-1000xm5": 299.99,
-        "nothing cmf buds 2a": 49.00,
-        "nothing cmf buds": 39.00,
-        "apple iphone 15 pro max": 1199.00,
-        "apple airpods pro (2nd gen)": 249.00,
-        "samsung galaxy s25 ultra": 1299.00,
-        "bose quietcomfort ultra": 429.00,
-    }
+    def __init__(self):
+        super().__init__()
+        self.search_service = ProductSearchService()
 
     @property
     def name(self) -> str:
@@ -36,28 +31,61 @@ class LivePriceAdapter(BaseProviderAdapter):
         return "price"
 
     def lookup(self, target: str) -> Dict[str, Any]:
-        """Determine MSRP baseline and historical price parameters for target product."""
+        """
+        Dynamically aggregates live retail prices for target product across multiple search providers.
+        Returns evidence-backed MSRP, market bounds, and price deviation percentages.
+        """
         start_t = time.time()
-        canonical = ProductCanonicalizer.canonicalize(target).lower()
+        canonical = ProductCanonicalizer.canonicalize(target)
 
-        msrp = 249.99
-        for key, val in self.KNOWN_MSRP_CATALOG.items():
-            if key in canonical or canonical in key:
-                msrp = val
-                break
+        try:
+            items = self.search_service.search_trusted_products(
+                canonical, target_price=0.0
+            )
+        except Exception as e:
+            logger.warning(f"Live price search notice for '{canonical}': {e}")
+            items = []
 
-        lowest_price = round(msrp * 0.75, 2)
-        avg_market = round(msrp * 0.90, 2)
         latency = round((time.time() - start_t) * 1000.0, 1)
 
+        if items and len(items) > 0:
+            prices = [item.price for item in items if item.price > 0]
+
+            if prices:
+                min_price = min(prices)
+                max_price = max(prices)
+                avg_price = round(sum(prices) / len(prices), 2)
+                official_msrp = (
+                    max_price  # Highest verified retail price as MSRP benchmark
+                )
+
+                return {
+                    "canonical_title": canonical,
+                    "average_msrp": official_msrp,
+                    "lowest_historical_price": min_price,
+                    "highest_historical_price": max_price,
+                    "average_market_price": avg_price,
+                    "sample_size": len(prices),
+                    "status": "Verified Evidence-Backed Retail Search",
+                    "live_retrieval": True,
+                    "provider": self.name,
+                    "latency_ms": latency,
+                    "sources": [item.store for item in items[:3]],
+                }
+
+        # Explicit "Unavailable" status when no live retailer prices are returned
         return {
-            "canonical_title": canonical.title(),
-            "average_msrp": msrp,
-            "lowest_historical_price": lowest_price,
-            "average_market_price": avg_market,
+            "canonical_title": canonical,
+            "average_msrp": 0.0,
+            "lowest_historical_price": 0.0,
+            "highest_historical_price": 0.0,
+            "average_market_price": 0.0,
+            "sample_size": 0,
+            "status": "Unavailable - Pending Retailer Search",
             "live_retrieval": True,
             "provider": self.name,
             "latency_ms": latency,
+            "sources": [],
         }
 
     def search(self, query: str) -> Dict[str, Any]:

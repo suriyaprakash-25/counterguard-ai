@@ -35,6 +35,10 @@ class ReportGenerator:
 
         findings = []
         se = evidence.structured_evidence if evidence else {}
+        if "authenticity" in se and se["authenticity"].get("status") == "Counterfeit":
+            findings.append(
+                f"Counterfeit Indicator: {se['authenticity'].get('reason')}"
+            )
         if "price" in se and se["price"].get("status") == "Suspicious":
             findings.append(f"Price Anomaly: {se['price'].get('reason')}")
         if "seller" in se and se["seller"].get("status") in ["Poor", "Missing"]:
@@ -52,7 +56,6 @@ class ReportGenerator:
 
         raw_score = risk.risk_score if risk else 50
 
-        # Extract actual seller_name from scraping_result (FIX ISSUE 2)
         raw_seller = (
             scraping_result.listing.seller_name
             if (

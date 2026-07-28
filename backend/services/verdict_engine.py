@@ -70,70 +70,93 @@ class VerdictEngine:
     comparison matrices from a single authoritative evaluator.
     """
 
-    @classmethod
-    def _calculate_findings_weight(cls, findings_list: List[str]) -> int:
-        findings_text = " ".join(findings_list).lower()
-        weight = 0
-        if any(
-            w in findings_text for w in ["replica", "clone", "fake", "copy", "99% new"]
-        ):
-            weight += 50
-        if any(
-            w in findings_text
-            for w in ["price anomaly", "price significantly lower", "price too low"]
-        ):
-            weight += 30
-        if any(
-            w in findings_text
-            for w in [
-                "seller risk",
-                "poor ratings",
-                "poor rating",
-                "unverified seller",
-                "reputation risk",
-            ]
-        ):
-            weight += 20
-        if any(
-            w in findings_text
-            for w in [
-                "warranty missing",
-                "no warranty",
-                "short warranty",
-                "seller provided warranty",
-            ]
-        ):
-            weight += 15
-        if any(
-            w in findings_text
-            for w in [
-                "unverified third-party",
-                "unverified distributor",
-                "refurbished",
-                "inconsistent brand",
-            ]
-        ):
-            weight += 15
-        if any(
-            w in findings_text
-            for w in [
-                "listing quality",
-                "low image count",
-                "one or fewer images",
-                "single image",
-            ]
-        ):
-            weight += 10
-        return weight
+    HIGH_SEVERITY_KEYWORDS = [
+        "replica",
+        "clone",
+        "fake",
+        "copy",
+        "99% new",
+        "trademark unverified",
+        "counterfeit",
+        "ip infringement",
+    ]
+
+    MEDIUM_SEVERITY_KEYWORDS = [
+        "price anomaly",
+        "price significantly lower",
+        "price too low",
+        "high price deviation",
+        "seller risk",
+        "poor rating",
+        "poor seller rating",
+        "poor seller reputation",
+        "unverified seller",
+        "reputation risk",
+        "warranty missing",
+        "no warranty",
+        "short warranty",
+        "seller provided warranty",
+        "unverified third-party",
+        "unverified distributor",
+        "refurbished",
+        "inconsistent brand",
+        "inconsistent warranty",
+        "misleading title",
+    ]
+
+    LOW_SEVERITY_KEYWORDS = [
+        "listing quality",
+        "low image count",
+        "one or fewer images",
+        "single image",
+        "lack of shipping",
+        "short description",
+        "limited product images",
+    ]
 
     @classmethod
-    def _classify_verdict(cls, risk_score: int) -> tuple[str, str]:
+    def _calculate_findings_weight(cls, findings_list: List[str]) -> tuple[int, bool]:
+        """
+        Calculates risk_score by severity weighting rather than pure count:
+        - HIGH severity: explicit counterfeit/replica/IP signals (+40 points each)
+        - MEDIUM severity: pricing/seller/warranty/distributor risks (+10 points each, capped at 45)
+        - LOW severity: image/shipping/listing quality (+3 points each, capped at 10)
+        Returns (weight, has_high_severity_findings)
+        """
+        findings_text = " ".join(findings_list).lower()
+        high_score = 0
+        medium_score = 0
+        low_score = 0
+
+        for keyword in cls.HIGH_SEVERITY_KEYWORDS:
+            if keyword in findings_text:
+                high_score += 40
+
+        for keyword in cls.MEDIUM_SEVERITY_KEYWORDS:
+            if keyword in findings_text:
+                medium_score += 10
+
+        for keyword in cls.LOW_SEVERITY_KEYWORDS:
+            if keyword in findings_text:
+                low_score += 3
+
+        medium_score = min(45, medium_score)
+        low_score = min(10, low_score)
+
+        has_high_severity = high_score > 0
+        total_weight = high_score + medium_score + low_score
+
+        return min(100, total_weight), has_high_severity
+
+    @classmethod
+    def _classify_verdict(
+        cls, risk_score: int, has_high_severity: bool
+    ) -> tuple[str, str]:
         if risk_score <= 20:
             return "AUTHENTIC", "LOW"
-        elif risk_score <= 45:
-            return "LOW_RISK", "MEDIUM"
-        elif risk_score <= 75:
-            return "SUSPICIOUS", "HIGH"
+        elif risk_score <= 65 or not has_high_severity:
+            # Without explicit HIGH severity counterfeit language, cap at SUSPICIOUS / MEDIUM
+            return "SUSPICIOUS", "MEDIUM"
         return "LIKELY_COUNTERFEIT", "CRITICAL"
 
     @classmethod
@@ -187,10 +210,18 @@ class VerdictEngine:
                 findings_list,
             )
 
-        findings_weight = cls._calculate_findings_weight(findings_list)
-        risk_score = max(int(raw_risk_score), min(100, findings_weight))
+        findings_weight, has_high_severity = cls._calculate_findings_weight(
+            findings_list
+        )
+        risk_score = max(
+            int(raw_risk_score if has_high_severity else 0), min(100, findings_weight)
+        )
 
-        final_verdict, risk_level = cls._classify_verdict(risk_score)
+        # Adjust score for medium tier if no high severity findings
+        if not has_high_severity and risk_score > 60:
+            risk_score = 55
+
+        final_verdict, risk_level = cls._classify_verdict(risk_score, has_high_severity)
 
         negative_findings = [
             f
@@ -340,21 +371,50 @@ class VerdictEngine:
         conf_pct,
         negative_findings,
     ):
+        top_findings_str = (
+            ", ".join(negative_findings[:3])
+            if negative_findings
+            else "No significant risk signals"
+        )
+
         if final_verdict == "AUTHENTIC":
             if negative_findings:
-                summary = f"Multi-agent evaluation of '{canonical_product}' on {marketplace} indicates authentic status (risk score {risk_score}/100), with minor observations: {negative_findings[0]}."
+                summary = (
+                    f"Multi-agent evaluation of '{canonical_product}' on {marketplace} indicates authentic status "
+                    f"(risk score {risk_score}/100), with minor observations: {negative_findings[0]}."
+                )
             else:
-                summary = f"Multi-agent swarm verified '{canonical_product}' as genuine on {marketplace}. Seller '{seller_name}' meets authentic baseline metrics with 0 risk signals detected."
-            reasoning = f"The listing price (${base_price:.2f}) aligns within {price_diff_pct}% of the market baseline (${avg_p:.2f}). Seller '{seller_name}' passed baseline verification with risk score {risk_score}/100 and {conf_pct}% confidence."
-        elif final_verdict == "LOW_RISK":
-            summary = f"Investigation of '{canonical_product}' on {marketplace} indicates MEDIUM risk profile (risk score {risk_score}/100). Flagged risk factors: {', '.join(negative_findings[:3])}."
-            reasoning = f"The listing price (${base_price:.2f}) deviates from the market average (${avg_p:.2f}). Seller '{seller_name}' triggered {len(negative_findings)} risk indicators resulting in a risk score of {risk_score}/100."
-        elif final_verdict == "SUSPICIOUS":
-            summary = f"Automated risk detection flagged '{canonical_product}' on {marketplace} as SUSPICIOUS (risk score {risk_score}/100). Risk signals detected: {', '.join(negative_findings[:3])}."
-            reasoning = f"Listing price (${base_price:.2f}) and merchant storefront '{seller_name}' triggered multiple risk signals. Total risk score: {risk_score}/100 with {conf_pct}% assessment confidence."
-        else:
-            summary = f"CRITICAL THREAT: '{canonical_product}' on {marketplace} is classified as LIKELY COUNTERFEIT (risk score {risk_score}/100). Severe risk signals detected: {', '.join(negative_findings[:3])}."
-            reasoning = f"The listing price (${base_price:.2f}) is significantly below market average (${avg_p:.2f}). Merchant '{seller_name}' triggered critical counterfeit indicators."
+                summary = (
+                    f"Multi-agent swarm verified '{canonical_product}' as genuine on {marketplace}. "
+                    f"Seller '{seller_name}' meets authentic baseline metrics with 0 risk signals detected."
+                )
+            reasoning = (
+                f"Listing for '{canonical_product}' (${base_price:.2f}) aligns with market baseline (${avg_p:.2f}). "
+                f"Verified seller '{seller_name}' passed identity checks with risk score {risk_score}/100 ({conf_pct}% confidence)."
+            )
+
+        elif final_verdict in ("SUSPICIOUS", "LOW_RISK"):
+            summary = (
+                f"Automated risk evaluation flagged '{canonical_product}' on {marketplace} as SUSPICIOUS "
+                f"(risk score {risk_score}/100, MEDIUM risk). Flagged factors: {top_findings_str}."
+            )
+            reasoning = (
+                f"Investigation of '{canonical_product}' (${base_price:.2f} vs market average ${avg_p:.2f}) flagged "
+                f"{len(negative_findings)} moderate risk indicators for seller '{seller_name}': {top_findings_str}. "
+                f"Assigning for analyst review (risk score {risk_score}/100, confidence {conf_pct}%)."
+            )
+
+        else:  # LIKELY_COUNTERFEIT / CRITICAL
+            summary = (
+                f"CRITICAL THREAT: '{canonical_product}' on {marketplace} is classified as LIKELY COUNTERFEIT "
+                f"(risk score {risk_score}/100, CRITICAL risk). Explicit counterfeit indicators detected: {top_findings_str}."
+            )
+            reasoning = (
+                f"Critical risk detection for '{canonical_product}' (${base_price:.2f} vs market average ${avg_p:.2f}) on seller "
+                f"'{seller_name}' triggered explicit counterfeit indicators: {top_findings_str}. "
+                f"Escalating for immediate takedown (risk score {risk_score}/100, confidence {conf_pct}%)."
+            )
+
         return summary, reasoning
 
     @classmethod
@@ -376,20 +436,21 @@ class VerdictEngine:
                     reason="Product specs and seller identity meet authentic baseline criteria.",
                 )
             ]
-        elif risk_level in ("MEDIUM", "HIGH"):
+        elif final_verdict == "SUSPICIOUS" or risk_level in ("MEDIUM", "HIGH"):
             return [
                 CategorizedRecommendationItem(
                     category="Manual Review",
                     priority="High",
-                    action=f"Assign brand analyst to inspect seller '{seller_name}' on {marketplace}.",
-                    reason=f"Risk score of {risk_score}/100 with {num_negatives} risk signals.",
+                    action=f"Flag for manual review: Assign brand analyst to inspect seller '{seller_name}' on {marketplace}.",
+                    reason=f"Moderate risk score of {risk_score}/100 with {num_negatives} risk signals. No explicit counterfeit language confirmed.",
                 )
             ]
+        # CRITICAL / LIKELY_COUNTERFEIT only
         return [
             CategorizedRecommendationItem(
                 category="Immediate",
                 priority="High",
                 action=f"Initiate formal IP infringement takedown request against seller '{seller_name}' on {marketplace}.",
-                reason=f"High risk score of {risk_score}/100 classified as LIKELY COUNTERFEIT.",
+                reason=f"Critical risk score of {risk_score}/100 classified as LIKELY COUNTERFEIT with explicit counterfeit indicators.",
             )
         ]

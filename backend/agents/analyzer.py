@@ -35,6 +35,9 @@ class AnalyzerAgent:
             for w in ["replica", "clone", "fake", "copy", "99% new"]
         )
 
+        if is_replica:
+            risk_signals.append("replica_keyword_detected")
+
         is_discount_or_refurbished = any(
             w in title_lower or w in desc_lower or w in seller_lower
             for w in ["refurbished", "unverified", "deals", "third party", "cheap"]

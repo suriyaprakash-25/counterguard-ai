@@ -93,4 +93,11 @@ class EvidenceCollector:
                 "reason": "No warranty information found",
             }
 
+        # Replica/Counterfeit Keyword Flag
+        if "replica_keyword_detected" in analysis.risk_signals:
+            structured_evidence["authenticity"] = {
+                "status": "Counterfeit",
+                "reason": "Explicit replica or clone wording detected in product listing title or description",
+            }
+
         return EvidenceResult(structured_evidence=structured_evidence)

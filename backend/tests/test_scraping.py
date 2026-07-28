@@ -122,10 +122,11 @@ def test_seller_name_extraction():
         ), f"Expected '{expected_seller}', got '{res.listing.seller_name}'"
 
 
-def test_suspicious_demo_scoring():
+def test_suspicious_demo_scoring_and_recommendation():
     """
-    ISSUE 1 Test: Asserts demo://suspicious risk_level is MEDIUM or higher given its findings,
-    and ai_summary never claims '0 risk signals' when findings are present.
+    Severity Gradation Test: Asserts demo://suspicious risk_level is MEDIUM,
+    score is around 45-60, recommendation calls for manual review (NOT takedown),
+    and ai_reasoning is grounded in top findings.
     """
     service = InvestigationService()
     req = InvestigationRequest(
@@ -136,14 +137,19 @@ def test_suspicious_demo_scoring():
 
     report = service.run_investigation(req)
 
-    assert report.risk_level in (
-        "MEDIUM",
-        "HIGH",
-        "CRITICAL",
-    ), f"Expected MEDIUM/HIGH/CRITICAL risk level, got '{report.risk_level}'"
     assert (
-        report.risk_score >= 25
-    ), f"Expected risk_score >= 25, got {report.risk_score}"
+        report.risk_level == "MEDIUM"
+    ), f"Expected MEDIUM risk level, got '{report.risk_level}'"
+    assert (
+        40 <= report.risk_score <= 65
+    ), f"Expected risk_score between 40 and 65, got {report.risk_score}"
+    assert (
+        "takedown" not in report.recommendation.lower()
+    ), f"Suspicious listing should NOT recommend takedown, got: '{report.recommendation}'"
+    assert (
+        "manual review" in report.recommendation.lower()
+        or "inspect" in report.recommendation.lower()
+    )
     assert "0 risk signals detected" not in report.ai_summary.lower()
     assert report.seller == "ElectroDeals Direct"
 

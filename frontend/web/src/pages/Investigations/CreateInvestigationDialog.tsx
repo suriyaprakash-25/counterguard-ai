@@ -107,7 +107,8 @@ const MISSION_OBJECTIVES = [
 const PLANNING_STRATEGIES = [
   {
     id: 'Fast Investigation',
-    title: '⚡ Fast Investigation',
+    title: 'Fast Investigation',
+    icon: Zap,
     runtime: '~15s',
     agents: 4,
     providers: 2,
@@ -115,7 +116,8 @@ const PLANNING_STRATEGIES = [
   },
   {
     id: 'Balanced Investigation',
-    title: '⚖️ Balanced Investigation',
+    title: 'Balanced Investigation',
+    icon: Sliders,
     runtime: '~30s',
     agents: 5,
     providers: 4,
@@ -123,7 +125,8 @@ const PLANNING_STRATEGIES = [
   },
   {
     id: 'Deep Intelligence',
-    title: '🧠 Deep Intelligence',
+    title: 'Deep Intelligence',
+    icon: Cpu,
     runtime: '~60s',
     agents: 7,
     providers: 6,
@@ -131,7 +134,8 @@ const PLANNING_STRATEGIES = [
   },
   {
     id: 'Full Autonomous Swarm',
-    title: '🚀 Full Autonomous Swarm',
+    title: 'Full Autonomous Swarm',
+    icon: Bot,
     runtime: '~90s',
     agents: 9,
     providers: 6,
@@ -561,6 +565,7 @@ export function CreateInvestigationDialog({ isOpen, onClose }: CreateInvestigati
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {PLANNING_STRATEGIES.map(strat => {
                       const isSelected = plannerStrategy === strat.id;
+                      const IconComp = strat.icon;
                       return (
                         <div
                           key={strat.id}
@@ -572,13 +577,16 @@ export function CreateInvestigationDialog({ isOpen, onClose }: CreateInvestigati
                           }`}
                         >
                           <div className="flex justify-between items-start mb-1">
-                            <h4 className="text-sm font-bold text-slate-900">{strat.title}</h4>
+                            <div className="flex items-center gap-2">
+                              <IconComp className="h-4 w-4 text-primary shrink-0" />
+                              <h4 className="text-sm font-bold text-slate-900">{strat.title}</h4>
+                            </div>
                             <span className="text-xs font-mono font-semibold text-primary">{strat.runtime}</span>
                           </div>
                           <p className="text-xs text-muted mb-3">{strat.desc}</p>
-                          <div className="flex items-center gap-3 text-[10px] font-mono text-slate-500 pt-2 border-t border-border/60">
-                            <span>🤖 {strat.agents} Agents</span>
-                            <span>🌐 {strat.providers} Search Providers</span>
+                          <div className="flex items-center gap-4 text-[10px] font-mono text-slate-500 pt-2 border-t border-border/60">
+                            <span className="flex items-center gap-1"><Bot className="h-3 w-3 text-slate-400" /> {strat.agents} Swarm Agents</span>
+                            <span className="flex items-center gap-1"><Globe className="h-3 w-3 text-slate-400" /> {strat.providers} Providers</span>
                           </div>
                         </div>
                       );

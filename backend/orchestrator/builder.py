@@ -105,6 +105,8 @@ def build_graph() -> StateGraph:  # noqa: C901
                 state.get("coordinator_result"),
                 state.get("recommended_products"),
                 state.get("scraping_result"),
+                state.get("visual_findings"),
+                state.get("visual_similarity"),
             )
         }
 

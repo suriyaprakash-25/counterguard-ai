@@ -15,6 +15,66 @@ from backend.services.verdict_engine import VerdictEngine
 
 
 class ReportGenerator:
+    def _build_structured_evidence(
+        self, evidence: EvidenceResult, visual_similarity: Optional[float]
+    ) -> Dict[str, Any]:
+        se = (
+            evidence.structured_evidence.copy()
+            if evidence and evidence.structured_evidence
+            else {}
+        )
+
+        if visual_similarity is not None and visual_similarity < 75.0:
+            se["visual"] = {
+                "status": "Mismatch",
+                "reason": f"Product image differs significantly from verified reference ({visual_similarity}% similarity)",
+            }
+        elif visual_similarity is not None:
+            se["visual"] = {
+                "status": "Verified",
+                "reason": f"Product image matches verified golden reference ({visual_similarity}% similarity)",
+            }
+
+        return se
+
+    def _collect_findings(
+        self,
+        se: Dict[str, Any],
+        visual_findings: Optional[List[str]],
+        ai_result: Optional[AIInvestigationResult],
+    ) -> List[str]:
+        findings = []
+
+        field_map = [
+            ("authenticity", "Counterfeit", "Counterfeit Indicator"),
+            ("price", "Suspicious", "Price Anomaly"),
+            ("seller", "Poor", "Seller Risk"),
+            ("seller", "Missing", "Seller Risk"),
+            ("images", "Poor", "Listing Quality"),
+            ("warranty", "Missing", "Warranty"),
+        ]
+
+        for key, status_val, label in field_map:
+            if key in se and se[key].get("status") == status_val:
+                finding_str = f"{label}: {se[key].get('reason')}"
+                if finding_str not in findings:
+                    findings.append(finding_str)
+
+        extra_lists = [
+            visual_findings,
+            getattr(ai_result, "suspicious_indicators", None),
+        ]
+        for lst in extra_lists:
+            if lst:
+                for item in lst:
+                    if item not in findings:
+                        findings.append(item)
+
+        if not findings:
+            findings.append("No significant risk indicators found.")
+
+        return findings
+
     def generate(
         self,
         analysis: AnalyzerResult,
@@ -23,6 +83,8 @@ class ReportGenerator:
         ai_result: Optional[AIInvestigationResult] = None,
         recommended_products: Optional[List[Dict[str, Any]]] = None,
         scraping_result: Optional[ScrapingResult] = None,
+        visual_findings: Optional[List[str]] = None,
+        visual_similarity: Optional[float] = None,
     ) -> InvestigationReport:
         """
         Synthesizes findings into a unified, zero-contradiction human-readable report.
@@ -33,26 +95,8 @@ class ReportGenerator:
             brand_hint=analysis.brand,
         )
 
-        findings = []
-        se = evidence.structured_evidence if evidence else {}
-        if "authenticity" in se and se["authenticity"].get("status") == "Counterfeit":
-            findings.append(
-                f"Counterfeit Indicator: {se['authenticity'].get('reason')}"
-            )
-        if "price" in se and se["price"].get("status") == "Suspicious":
-            findings.append(f"Price Anomaly: {se['price'].get('reason')}")
-        if "seller" in se and se["seller"].get("status") in ["Poor", "Missing"]:
-            findings.append(f"Seller Risk: {se['seller'].get('reason')}")
-        if "images" in se and se["images"].get("status") == "Poor":
-            findings.append(f"Listing Quality: {se['images'].get('reason')}")
-        if "warranty" in se and se["warranty"].get("status") == "Missing":
-            findings.append(f"Warranty: {se['warranty'].get('reason')}")
-
-        if ai_result and ai_result.suspicious_indicators:
-            findings.extend(ai_result.suspicious_indicators)
-
-        if not findings:
-            findings.append("No significant risk indicators found.")
+        se = self._build_structured_evidence(evidence, visual_similarity)
+        findings = self._collect_findings(se, visual_findings, ai_result)
 
         raw_score = risk.risk_score if risk else 50
 

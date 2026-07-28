@@ -1,4 +1,5 @@
-from typing import Annotated, Dict, TypedDict, List, Any
+import operator
+from typing import Annotated, Any, Dict, List, TypedDict
 
 from backend.collaboration.models.context import AgentWorkspace, InvestigationContext
 from backend.schemas.investigation import (
@@ -46,9 +47,20 @@ def merge_context(
     return merged
 
 
+def merge_dict(a: dict, b: dict) -> dict:
+    if not a:
+        return b or {}
+    if not b:
+        return a or {}
+    res = a.copy()
+    res.update(b)
+    return res
+
+
 class InvestigationState(TypedDict, total=False):
     """
     Shared state containing the legacy pipeline outputs and the new Collaborative Blackboard.
+    Annotated with proper list/dict reducers so parallel fan-out nodes accumulate state without overwriting.
     """
 
     request: InvestigationRequest
@@ -66,6 +78,12 @@ class InvestigationState(TypedDict, total=False):
     # -- SPRINT 12: COLLABORATIVE BLACKBOARD --
     context: Annotated[InvestigationContext, merge_context]
     workspaces: Dict[str, AgentWorkspace]  # Maps agent name to their workspace
+
+    # Parallel Specialist State Accumulators (Proper Reducers)
+    visual_similarity: float
+    visual_findings: Annotated[List[str], operator.add]
+    specialist_findings: Annotated[List[str], operator.add]
+    specialist_evidence: Annotated[Dict[str, Any], merge_dict]
 
     # Explanations
     explanation: str

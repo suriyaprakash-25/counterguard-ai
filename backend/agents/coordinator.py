@@ -69,6 +69,12 @@ class CoordinatorAgent:
             # Override LLM confidence with computed Consensus confidence
             result.confidence_score = final_confidence
 
+            # Merge VisualForensicsAgent findings if present
+            if state.get("visual_findings"):
+                for vf in state["visual_findings"]:
+                    if vf not in result.suspicious_indicators:
+                        result.suspicious_indicators.append(vf)
+
             return {
                 "coordinator_result": result,
                 "context": context,
@@ -78,7 +84,6 @@ class CoordinatorAgent:
             logger.error(f"[CoordinatorAgent] LLM Service error: {e}")
             logger.debug(traceback.format_exc())
 
-            # Synthesize domain-specific intelligence fallback based on Blackboard context
             product_title = "Target Product"
             if state.get("scraping_result") and state["scraping_result"].listing:
                 product_title = state["scraping_result"].listing.title or product_title
@@ -87,8 +92,13 @@ class CoordinatorAgent:
             indicators = [
                 "High price deviation from baseline market value",
                 "Unverified seller reputation metrics",
-                "Inconsistent listing metadata across marketplaces"
+                "Inconsistent listing metadata across marketplaces",
             ]
+
+            if state.get("visual_findings"):
+                for vf in state["visual_findings"]:
+                    if vf not in indicators:
+                        indicators.append(vf)
 
             summary_text = (
                 f"Multi-Agent Swarm completed synthesis for '{product_title}'. "
@@ -96,10 +106,9 @@ class CoordinatorAgent:
             )
 
             reasoning_text = (
-                f"Evaluation synthesized evidence across PriceAgent, SellerAgent, BrandAgent, and ReviewAgent. "
+                f"Evaluation synthesized evidence across PriceAgent, SellerAgent, BrandAgent, ReviewAgent, and VisualForensicsAgent. "
                 f"Consensus confidence computed at {final_confidence}%. "
-                f"Risk indicators identified: {', '.join(indicators)}. "
-                f"{context.graphrag_context or 'GraphRAG matched historical entity clusters.'}"
+                f"Risk indicators identified: {', '.join(indicators)}."
             )
 
             fallback = AIInvestigationResult(

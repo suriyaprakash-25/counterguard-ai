@@ -11,6 +11,7 @@ from backend.agents.planner import PlanningAgent
 from backend.agents.reporter import ReportGenerator
 from backend.agents.specialists import BrandAgent, PriceAgent, ReviewAgent, SellerAgent
 from backend.agents.trusted_product_agent import TrustedProductAgent
+from backend.agents.visual import VisualForensicsAgent
 from backend.services.scraping_service import ScrapingService
 from backend.state import InvestigationState
 from backend.tools.live_tools import (
@@ -31,7 +32,7 @@ def build_graph() -> StateGraph:  # noqa: C901
     Builds and returns the authoritative LangGraph StateGraph for multi-agent collaborative investigation.
     Streamlined pipeline:
       scraper -> analyzer -> collector -> assessor -> planner ->
-      (conditional routing to specialists) -> coordinator -> trusted_product -> reporter -> END
+      (conditional routing to parallel specialists including visual) -> coordinator -> trusted_product -> reporter -> END
     """
     graph = StateGraph(InvestigationState)
 
@@ -67,6 +68,7 @@ def build_graph() -> StateGraph:  # noqa: C901
         ]
     )
     review_agent = ReviewAgent(tools=[registry.get_tool("reverse_image_search")])
+    visual_agent = VisualForensicsAgent()
     coordinator_agent = CoordinatorAgent()
     trusted_product_agent = TrustedProductAgent()
 
@@ -116,18 +118,25 @@ def build_graph() -> StateGraph:  # noqa: C901
             if plan and plan.selected_specialists:
                 selected = plan.selected_specialists
             else:
-                selected = ["PriceAgent", "SellerAgent", "BrandAgent", "ReviewAgent"]
+                selected = [
+                    "PriceAgent",
+                    "SellerAgent",
+                    "BrandAgent",
+                    "ReviewAgent",
+                    "VisualForensicsAgent",
+                ]
 
         node_map = {
             "PriceAgent": "price_agent",
             "SellerAgent": "seller_agent",
             "BrandAgent": "brand_agent",
             "ReviewAgent": "review_agent",
+            "VisualForensicsAgent": "visual",
         }
 
         destinations = [node_map[s] for s in selected if s in node_map]
-        if not destinations:
-            return ["coordinator"]
+        if "visual" not in destinations:
+            destinations.append("visual")
         return destinations
 
     # Add Nodes
@@ -141,6 +150,7 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_node("seller_agent", seller_agent.run)
     graph.add_node("brand_agent", brand_agent.run)
     graph.add_node("review_agent", review_agent.run)
+    graph.add_node("visual", visual_agent.run)
 
     graph.add_node("coordinator", coordinator_agent.run)
     graph.add_node("trusted_product", trusted_product_agent.run)
@@ -159,6 +169,7 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_edge("seller_agent", "coordinator")
     graph.add_edge("brand_agent", "coordinator")
     graph.add_edge("review_agent", "coordinator")
+    graph.add_edge("visual", "coordinator")
 
     graph.add_edge("coordinator", "trusted_product")
     graph.add_edge("trusted_product", "reporter")

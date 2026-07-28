@@ -79,6 +79,9 @@ class VerdictEngine:
         "trademark unverified",
         "counterfeit",
         "ip infringement",
+        "visual mismatch",
+        "visual difference",
+        "image differs",
     ]
 
     MEDIUM_SEVERITY_KEYWORDS = [
@@ -118,7 +121,7 @@ class VerdictEngine:
     def _calculate_findings_weight(cls, findings_list: List[str]) -> tuple[int, bool]:
         """
         Calculates risk_score by severity weighting rather than pure count:
-        - HIGH severity: explicit counterfeit/replica/IP signals (+40 points each)
+        - HIGH severity: explicit counterfeit/replica/IP/visual mismatch signals (+40 points each)
         - MEDIUM severity: pricing/seller/warranty/distributor risks (+10 points each, capped at 45)
         - LOW severity: image/shipping/listing quality (+3 points each, capped at 10)
         Returns (weight, has_high_severity_findings)
@@ -155,7 +158,6 @@ class VerdictEngine:
         if risk_score <= 20:
             return "AUTHENTIC", "LOW"
         elif risk_score <= 65 or not has_high_severity:
-            # Without explicit HIGH severity counterfeit language, cap at SUSPICIOUS / MEDIUM
             return "SUSPICIOUS", "MEDIUM"
         return "LIKELY_COUNTERFEIT", "CRITICAL"
 
@@ -217,7 +219,6 @@ class VerdictEngine:
             int(raw_risk_score if has_high_severity else 0), min(100, findings_weight)
         )
 
-        # Adjust score for medium tier if no high severity findings
         if not has_high_severity and risk_score > 60:
             risk_score = 55
 

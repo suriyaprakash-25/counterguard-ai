@@ -6,6 +6,12 @@ from pydantic import BaseModel, Field
 class InvestigationRequest(BaseModel):
     listing_url: str
     marketplace: str
+    investigation_type: Optional[str] = "Counterfeit Detection"
+    planner_strategy: Optional[str] = "Deep Intelligence"
+    objectives: List[str] = Field(default_factory=list)
+    target_type: Optional[str] = "Marketplace Product URL"
+    target_value: Optional[str] = ""
+    advanced_options: Optional[Dict[str, Any]] = None
 
 
 class AnalyzerResult(BaseModel):

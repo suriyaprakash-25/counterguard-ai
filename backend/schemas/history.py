@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, List, Optional, Dict
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -17,6 +17,8 @@ class InvestigationHistoryItem(BaseModel):
     status: str
     created_at: str
     updated_at: str
+    display_title: Optional[str] = None
+    original_target: Optional[str] = None
     product: Optional[str] = None
     risk_level: Optional[str] = None
     risk_score: Optional[int] = None
@@ -79,6 +81,8 @@ class InvestigationDetailResponse(BaseModel):
     status: str
     created_at: str
     updated_at: str
+    display_title: Optional[str] = None
+    original_target: Optional[str] = None
     report: Optional[InvestigationReport] = None
     evidence_timeline: List[EvidenceItemSchema] = Field(default_factory=list)
 

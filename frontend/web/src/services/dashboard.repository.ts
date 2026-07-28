@@ -8,6 +8,7 @@ import type {
   SystemHealth,
   FraudNodePreview
 } from '../types/dashboard';
+import { resolveInvestigationTitle } from './target_normalization';
 
 export const DashboardRepository = {
   async getSummary(): Promise<DashboardSummary> {
@@ -27,15 +28,21 @@ export const DashboardRepository = {
   async getRecentInvestigations(): Promise<InvestigationSummary[]> {
     const { data } = await apiClient.get(endpoints.investigations.list, { params: { page_size: 5 } });
     const rawItems = Array.isArray(data?.data) ? data.data : (data?.data?.items || []);
-    return rawItems.map((inv: any) => ({
-      id: inv.id,
-      name: inv.name || (inv.product ? `${inv.product} Assessment` : (inv.listing_url || `Investigation ${inv.id.substring(0, 8)}`)),
-      marketplace: inv.marketplace || 'Global Search',
-      status: inv.status || 'completed',
-      riskScore: inv.riskScore ?? inv.risk_score ?? 0,
-      createdAt: inv.createdAt || inv.created_at || new Date().toISOString(),
-    }));
+    return rawItems.map((inv: any) => {
+      const displayTitle = resolveInvestigationTitle(inv);
+      return {
+        id: inv.id,
+        name: displayTitle,
+        displayTitle,
+        originalTarget: inv.original_target || inv.listing_url || '',
+        marketplace: inv.marketplace || 'Global Search',
+        status: inv.status || 'completed',
+        riskScore: inv.riskScore ?? inv.risk_score ?? 0,
+        createdAt: inv.createdAt || inv.created_at || new Date().toISOString(),
+      };
+    });
   },
+
 
   async getRecentAlerts(): Promise<AlertSummary[]> {
     const { data } = await apiClient.get(endpoints.alerts.list, { params: { limit: 4 } });

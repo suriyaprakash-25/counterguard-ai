@@ -46,6 +46,8 @@ function getSeverityBadge(severity?: string) {
 // --- 2. Executive Summary Card ---
 export function SummaryCard({ data }: { data: InvestigationWorkspaceDetails }) {
   const verdictCfg = getVerdictConfig(data.finalVerdict, data.riskScore);
+  const originalTarget = data.originalTarget || '';
+  const isRealUrl = originalTarget.startsWith('http://') || originalTarget.startsWith('https://');
 
   return (
     <Card className="border-l-4 border-l-primary shadow-sm">
@@ -78,12 +80,33 @@ export function SummaryCard({ data }: { data: InvestigationWorkspaceDetails }) {
             <p className="text-sm text-slate-700 leading-relaxed font-normal bg-slate-50 p-3.5 rounded-lg border border-border">
               {data.aiSummary}
             </p>
+            {/* Original Target Disclosure */}
+            {originalTarget && (
+              <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-500">
+                <Link2 className="h-3 w-3 shrink-0 text-slate-400" />
+                <span className="font-medium text-slate-600">Original Target:</span>
+                <span className="font-mono truncate max-w-[300px] text-slate-500" title={originalTarget}>
+                  {originalTarget.length > 50 ? originalTarget.substring(0, 50) + '…' : originalTarget}
+                </span>
+                {isRealUrl && (
+                  <a
+                    href={originalTarget}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-1 inline-flex items-center gap-1 text-primary hover:underline font-semibold shrink-0"
+                  >
+                    View Original URL <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
     </Card>
   );
 }
+
 
 // --- NEW: 2.1 Provider Health Dashboard Widget ---
 export function ProviderHealthWidget() {

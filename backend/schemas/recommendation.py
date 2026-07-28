@@ -1,6 +1,12 @@
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Union
+
 from pydantic import BaseModel, Field
+
+from backend.schemas.product_intelligence import IntelligentProduct
+from backend.schemas.product_intelligence import (
+    ProductNormalized as IntelligenceProductNormalized,
+)
 
 
 class RetrievedProduct(BaseModel):
@@ -16,7 +22,9 @@ class RetrievedProduct(BaseModel):
     warranty: str = "Official Manufacturer Warranty"
     image_url: Optional[str] = None
     product_url: str
-    retrieved_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    retrieved_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     source_provider: str = "Direct Brand Search"
     domain: str = "official"
     metadata_completeness: float = 1.0
@@ -33,11 +41,14 @@ class ProductNormalized(BaseModel):
     category: str
     variant: Optional[str] = None
     normalized_title: str
+    extracted_keywords: List[str] = Field(default_factory=list)
 
 
 class TrustedProductResult(BaseModel):
-    normalized_product: ProductNormalized
-    recommended_products: List[RetrievedProduct] = Field(default_factory=list)
+    normalized_product: Union[ProductNormalized, IntelligenceProductNormalized]
+    recommended_products: List[Union[IntelligentProduct, RetrievedProduct]] = Field(
+        default_factory=list
+    )
     comparison: Optional[Dict[str, Any]] = None
     search_status: str = "success"
     message: Optional[str] = None

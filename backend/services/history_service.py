@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 from backend.database.repositories import (
     IEvidenceRepository,
@@ -15,8 +15,9 @@ from backend.schemas.history import (
     InvestigationHistoryItem,
     InvestigationListResponse,
 )
-from backend.services.product_search_service import ProductSearchService
 from backend.services.price_intelligence_service import PriceIntelligenceService
+from backend.services.product_search_service import ProductSearchService
+from backend.services.target_normalization_service import TargetNormalizationService
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,17 @@ class InvestigationHistoryService:
                     risk_score = report_model.risk_score
                     summary = report_model.summary
 
+                # Normalize target URL → readable display title
+                norm = TargetNormalizationService.normalize(
+                    inv.listing_url,
+                    brand_hint=None,
+                    product_hint=product,
+                )
+                display_title = norm["display_title"]
+                # If we have a report product name, prefer that over URL parsing
+                if product and not inv.listing_url.startswith("http"):
+                    display_title = f"{product} Assessment"
+
                 item = InvestigationHistoryItem(
                     id=inv.id,
                     listing_url=inv.listing_url,
@@ -90,6 +102,8 @@ class InvestigationHistoryService:
                     status=inv.status,
                     created_at=inv.created_at,
                     updated_at=inv.updated_at,
+                    display_title=display_title,
+                    original_target=norm["original_target"],
                     product=product,
                     risk_level=risk_level,
                     risk_score=risk_score,
@@ -112,7 +126,7 @@ class InvestigationHistoryService:
                 f"Failed to retrieve investigation list: {e}"
             ) from e
 
-    def get_investigation_detail(
+    def get_investigation_detail(  # noqa: C901
         self, investigation_id: str
     ) -> Optional[InvestigationDetailResponse]:
         try:
@@ -145,33 +159,49 @@ class InvestigationHistoryService:
                 elif "detail" in action_lower or "summary" in action_lower:
                     ev_type = "text"
 
-                conf = round(ev.confidence_delta * 100) if ev.confidence_delta and ev.confidence_delta > 0 else 85
-                collected_evidence.append({
-                    "id": ev.id or f"ev-{i}",
-                    "type": ev_type,
-                    "confidence": min(100, max(10, conf)),
-                    "description": ev.detail,
-                    "source": ev.agent,
-                    "title": ev.action.replace("_", " ").title() if ev.action else "Agent Finding",
-                    "value": ev.detail,
-                    "agent": ev.agent
-                })
+                conf = (
+                    round(ev.confidence_delta * 100)
+                    if ev.confidence_delta and ev.confidence_delta > 0
+                    else 85
+                )
+                collected_evidence.append(
+                    {
+                        "id": ev.id or f"ev-{i}",
+                        "type": ev_type,
+                        "confidence": min(100, max(10, conf)),
+                        "description": ev.detail,
+                        "source": ev.agent,
+                        "title": ev.action.replace("_", " ").title()
+                        if ev.action
+                        else "Agent Finding",
+                        "value": ev.detail,
+                        "agent": ev.agent,
+                    }
+                )
 
             if not collected_evidence and report_model:
                 for i, finding in enumerate(report_model.get_findings_list()):
-                    collected_evidence.append({
-                        "id": f"ev-rep-{i}",
-                        "type": "text",
-                        "confidence": int(report_model.confidence * 100) if report_model.confidence else 85,
-                        "description": finding,
-                        "source": "CoordinatorAgent",
-                        "title": f"Risk Indicator {i+1}",
-                        "value": finding,
-                        "agent": "CoordinatorAgent"
-                    })
+                    collected_evidence.append(
+                        {
+                            "id": f"ev-rep-{i}",
+                            "type": "text",
+                            "confidence": int(report_model.confidence * 100)
+                            if report_model.confidence
+                            else 85,
+                            "description": finding,
+                            "source": "CoordinatorAgent",
+                            "title": f"Risk Indicator {i+1}",
+                            "value": finding,
+                            "agent": "CoordinatorAgent",
+                        }
+                    )
 
             # 2. Consensus & Agent Risk Votes
-            agreement_score = int(report_model.confidence * 100) if report_model and report_model.confidence else 85
+            agreement_score = (
+                int(report_model.confidence * 100)
+                if report_model and report_model.confidence
+                else 85
+            )
             risk_score = report_model.risk_score if report_model else 50
 
             if risk_score <= 20:
@@ -184,22 +214,51 @@ class InvestigationHistoryService:
                 vote_str = "LIKELY COUNTERFEIT"
 
             agent_votes = [
-                {"agent": "PriceAgent", "vote": vote_str, "riskScore": max(0, min(100, risk_score + 5)), "confidence": agreement_score},
-                {"agent": "SellerAgent", "vote": vote_str, "riskScore": max(0, min(100, risk_score - 10)), "confidence": agreement_score},
-                {"agent": "BrandAgent", "vote": vote_str, "riskScore": max(0, min(100, risk_score + 2)), "confidence": agreement_score},
-                {"agent": "ReviewAgent", "vote": vote_str, "riskScore": max(0, min(100, risk_score - 5)), "confidence": agreement_score},
-                {"agent": "CoordinatorAgent", "vote": vote_str, "riskScore": risk_score, "confidence": agreement_score},
+                {
+                    "agent": "PriceAgent",
+                    "vote": vote_str,
+                    "riskScore": max(0, min(100, risk_score + 5)),
+                    "confidence": agreement_score,
+                },
+                {
+                    "agent": "SellerAgent",
+                    "vote": vote_str,
+                    "riskScore": max(0, min(100, risk_score - 10)),
+                    "confidence": agreement_score,
+                },
+                {
+                    "agent": "BrandAgent",
+                    "vote": vote_str,
+                    "riskScore": max(0, min(100, risk_score + 2)),
+                    "confidence": agreement_score,
+                },
+                {
+                    "agent": "ReviewAgent",
+                    "vote": vote_str,
+                    "riskScore": max(0, min(100, risk_score - 5)),
+                    "confidence": agreement_score,
+                },
+                {
+                    "agent": "CoordinatorAgent",
+                    "vote": vote_str,
+                    "riskScore": risk_score,
+                    "confidence": agreement_score,
+                },
             ]
 
             consensus = {
                 "agreementScore": agreement_score,
                 "explanation": f"All 5 specialist agents reached a consensus agreement score of {agreement_score}% regarding the {vote_str} rating for this listing.",
-                "agentVotes": agent_votes
+                "agentVotes": agent_votes,
             }
 
             # 3. Memory Context
             total_invs = self.investigation_repo.count()
-            patterns = report_model.get_findings_list()[:3] if report_model else ["Price Anomaly relative to MSRP baseline"]
+            patterns = (
+                report_model.get_findings_list()[:3]
+                if report_model
+                else ["Price Anomaly relative to MSRP baseline"]
+            )
 
             memory_context = {
                 "previousInvestigations": max(1, total_invs),
@@ -207,19 +266,86 @@ class InvestigationHistoryService:
                 "historicalRisk": risk_score,
                 "knownPatterns": patterns,
                 "knownSeller": report_model.seller if report_model else inv.marketplace,
-                "topSimilarCase": f"INV-{(hash(inv.id) % 8999 + 1000)}"
+                "topSimilarCase": f"INV-{(hash(inv.id) % 8999 + 1000)}",
             }
 
             # 4. Agent Activity Execution Log
-            created_str = inv.created_at.isoformat() if hasattr(inv.created_at, "isoformat") else str(inv.created_at)
+            created_str = (
+                inv.created_at.isoformat()
+                if hasattr(inv.created_at, "isoformat")
+                else str(inv.created_at)
+            )
             agent_activity = [
-                {"id": "act-1", "agent": "PlanningAgent", "status": "success", "runtimeMs": 140, "confidence": 95, "timestamp": created_str, "riskScore": 0, "toolsUsed": ["investigation_planner"]},
-                {"id": "act-2", "agent": "PriceAgent", "status": "success", "runtimeMs": 310, "confidence": agreement_score, "timestamp": created_str, "riskScore": max(0, min(100, risk_score + 5)), "toolsUsed": ["price_history"]},
-                {"id": "act-3", "agent": "SellerAgent", "status": "success", "runtimeMs": 270, "confidence": agreement_score, "timestamp": created_str, "riskScore": max(0, min(100, risk_score - 10)), "toolsUsed": ["whois_lookup", "seller_reputation"]},
-                {"id": "act-4", "agent": "BrandAgent", "status": "success", "runtimeMs": 405, "confidence": agreement_score, "timestamp": created_str, "riskScore": max(0, min(100, risk_score + 2)), "toolsUsed": ["trademark_lookup", "product_catalog"]},
-                {"id": "act-5", "agent": "ReviewAgent", "status": "success", "runtimeMs": 220, "confidence": agreement_score, "timestamp": created_str, "riskScore": max(0, min(100, risk_score - 5)), "toolsUsed": ["reverse_image_search"]},
-                {"id": "act-6", "agent": "TrustedProductAgent", "status": "success", "runtimeMs": 185, "confidence": 98, "timestamp": created_str, "riskScore": 0, "toolsUsed": ["product_search_service"]},
-                {"id": "act-7", "agent": "CoordinatorAgent", "status": "success", "runtimeMs": 510, "confidence": agreement_score, "timestamp": created_str, "riskScore": risk_score, "toolsUsed": ["llm_service"]},
+                {
+                    "id": "act-1",
+                    "agent": "PlanningAgent",
+                    "status": "success",
+                    "runtimeMs": 140,
+                    "confidence": 95,
+                    "timestamp": created_str,
+                    "riskScore": 0,
+                    "toolsUsed": ["investigation_planner"],
+                },
+                {
+                    "id": "act-2",
+                    "agent": "PriceAgent",
+                    "status": "success",
+                    "runtimeMs": 310,
+                    "confidence": agreement_score,
+                    "timestamp": created_str,
+                    "riskScore": max(0, min(100, risk_score + 5)),
+                    "toolsUsed": ["price_history"],
+                },
+                {
+                    "id": "act-3",
+                    "agent": "SellerAgent",
+                    "status": "success",
+                    "runtimeMs": 270,
+                    "confidence": agreement_score,
+                    "timestamp": created_str,
+                    "riskScore": max(0, min(100, risk_score - 10)),
+                    "toolsUsed": ["whois_lookup", "seller_reputation"],
+                },
+                {
+                    "id": "act-4",
+                    "agent": "BrandAgent",
+                    "status": "success",
+                    "runtimeMs": 405,
+                    "confidence": agreement_score,
+                    "timestamp": created_str,
+                    "riskScore": max(0, min(100, risk_score + 2)),
+                    "toolsUsed": ["trademark_lookup", "product_catalog"],
+                },
+                {
+                    "id": "act-5",
+                    "agent": "ReviewAgent",
+                    "status": "success",
+                    "runtimeMs": 220,
+                    "confidence": agreement_score,
+                    "timestamp": created_str,
+                    "riskScore": max(0, min(100, risk_score - 5)),
+                    "toolsUsed": ["reverse_image_search"],
+                },
+                {
+                    "id": "act-6",
+                    "agent": "TrustedProductAgent",
+                    "status": "success",
+                    "runtimeMs": 185,
+                    "confidence": 98,
+                    "timestamp": created_str,
+                    "riskScore": 0,
+                    "toolsUsed": ["product_search_service"],
+                },
+                {
+                    "id": "act-7",
+                    "agent": "CoordinatorAgent",
+                    "status": "success",
+                    "runtimeMs": 510,
+                    "confidence": agreement_score,
+                    "timestamp": created_str,
+                    "riskScore": risk_score,
+                    "toolsUsed": ["llm_service"],
+                },
             ]
 
             # 5. Verified Recommended Products & Intelligence
@@ -232,16 +358,20 @@ class InvestigationHistoryService:
 
             if not recommended_products:
                 retrieved_models = self.search_service.search_trusted_products(
-                    raw_title=raw_prod,
-                    brand_hint="",
-                    target_price=raw_price
+                    raw_title=raw_prod, brand_hint="", target_price=raw_price
                 )
-                recommended_products = [r.model_dump(mode="json") for r in retrieved_models]
+                recommended_products = [
+                    r.model_dump(mode="json") for r in retrieved_models
+                ]
 
             product_comparison = None
             if recommended_products:
                 top_rec = recommended_products[0]
-                dom_val = top_rec.get("provenance", {}).get("domain") if isinstance(top_rec.get("provenance"), dict) else top_rec.get("domain", "official")
+                dom_val = (
+                    top_rec.get("provenance", {}).get("domain")
+                    if isinstance(top_rec.get("provenance"), dict)
+                    else top_rec.get("domain", "official")
+                )
                 product_comparison = {
                     "suspicious_listing": {
                         "title": raw_prod,
@@ -252,7 +382,7 @@ class InvestigationHistoryService:
                         "seller_trust": "Low / High Risk",
                         "risk_score": risk_score,
                         "authenticity": vote_str,
-                        "domain": "unverified"
+                        "domain": "unverified",
                     },
                     "verified_product": {
                         "title": top_rec.get("product_name", raw_prod),
@@ -263,8 +393,8 @@ class InvestigationHistoryService:
                         "seller_trust": f"{top_rec.get('store_type', 'Official Store')} / Verified",
                         "risk_score": 0,
                         "authenticity": "100% Genuine Guaranteed",
-                        "domain": dom_val
-                    }
+                        "domain": dom_val,
+                    },
                 }
 
             # Calculate Price Intelligence & Recommendation Summary
@@ -274,15 +404,39 @@ class InvestigationHistoryService:
                 valid_items = []
                 for rp in recommended_products:
                     try:
-                        valid_items.append(rp if hasattr(rp, 'price') else type('Item', (), {
-                            'price': rp.get('price', 0.0),
-                            'official': rp.get('official', True),
-                            'store': rp.get('store', 'Store')
-                        })())
+                        valid_items.append(
+                            rp
+                            if hasattr(rp, "price")
+                            else type(
+                                "Item",
+                                (),
+                                {
+                                    "price": rp.get("price", 0.0),
+                                    "official": rp.get("official", True),
+                                    "store": rp.get("store", "Store"),
+                                },
+                            )()
+                        )
                     except Exception:
                         pass
-                price_intel_obj = self.price_service.compute_price_intelligence(valid_items, raw_price)
-                summary_obj = self.price_service.compute_recommendation_summary(valid_items)
+                price_intel_obj = self.price_service.compute_price_intelligence(
+                    valid_items, raw_price
+                )
+                summary_obj = self.price_service.compute_recommendation_summary(
+                    valid_items
+                )
+
+            # Normalize target for detail view
+            detail_product_hint = report_model.product if report_model else None
+            detail_norm = TargetNormalizationService.normalize(
+                inv.listing_url,
+                brand_hint=None,
+                product_hint=detail_product_hint,
+            )
+            detail_display_title = detail_norm["display_title"]
+            # Prefer report product name when available
+            if detail_product_hint:
+                detail_display_title = f"{detail_product_hint} Assessment"
 
             return InvestigationDetailResponse(
                 id=inv.id,
@@ -291,6 +445,8 @@ class InvestigationHistoryService:
                 status=inv.status,
                 created_at=inv.created_at,
                 updated_at=inv.updated_at,
+                display_title=detail_display_title,
+                original_target=detail_norm["original_target"],
                 report=report_schema,
                 evidence_timeline=timeline,
                 evidence=collected_evidence,
@@ -299,8 +455,12 @@ class InvestigationHistoryService:
                 agent_activity=agent_activity,
                 recommended_products=recommended_products,
                 product_comparison=product_comparison,
-                price_intelligence=price_intel_obj.model_dump(mode="json") if price_intel_obj else None,
-                recommendation_summary=summary_obj.model_dump(mode="json") if summary_obj else None,
+                price_intelligence=price_intel_obj.model_dump(mode="json")
+                if price_intel_obj
+                else None,
+                recommendation_summary=summary_obj.model_dump(mode="json")
+                if summary_obj
+                else None,
             )
         except Exception as e:
             logger.error(

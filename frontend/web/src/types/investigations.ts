@@ -1,6 +1,8 @@
 export interface InvestigationSummary {
   id: string;
   name: string;
+  displayTitle: string;
+  originalTarget?: string;
   marketplace: string;
   status: "pending" | "in_progress" | "completed" | "failed";
   riskScore: number;

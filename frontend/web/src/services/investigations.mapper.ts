@@ -8,12 +8,16 @@ import type {
   PriceIntelligence,
   RecommendationSummary
 } from '../types/investigations';
+import { resolveInvestigationTitle } from './target_normalization';
 
 export const InvestigationsMapper = {
   toSummary(dto: any): InvestigationSummary {
+    const displayTitle = resolveInvestigationTitle(dto);
     return {
       id: dto.id || '',
-      name: dto.name || (dto.report?.product ? `${dto.report.product} Assessment` : dto.listing_url) || dto.id || 'Unknown Investigation',
+      name: displayTitle,
+      displayTitle,
+      originalTarget: dto.original_target || dto.listing_url || '',
       marketplace: dto.marketplace || dto.report?.marketplace || 'Global Search',
       status: dto.status || 'pending',
       riskScore: dto.risk_score ?? dto.report?.risk_score ?? 0,
@@ -24,6 +28,7 @@ export const InvestigationsMapper = {
       lastUpdated: dto.updated_at || new Date().toISOString(),
     };
   },
+
 
   toWorkspaceDetails(dto: any): InvestigationWorkspaceDetails {
     const summary = this.toSummary(dto);

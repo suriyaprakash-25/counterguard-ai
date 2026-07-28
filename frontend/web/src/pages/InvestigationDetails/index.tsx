@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useInvestigationDetails } from "../../hooks/useInvestigations";
 import {
   SummaryCard,

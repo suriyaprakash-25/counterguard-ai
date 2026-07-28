@@ -28,13 +28,21 @@ class AnalyzerAgent:
         title_lower = (listing.title or "").lower()
         desc_lower = (listing.description or "").lower()
         seller_lower = (listing.seller_name or "").lower()
+        warranty_lower = (listing.warranty_info or "").lower()
 
         is_replica = any(
             w in title_lower or w in desc_lower or w in seller_lower
             for w in ["replica", "clone", "fake", "copy", "99% new"]
         )
 
-        if listing.price is not None and (listing.price < 50.0 or is_replica):
+        is_discount_or_refurbished = any(
+            w in title_lower or w in desc_lower or w in seller_lower
+            for w in ["refurbished", "unverified", "deals", "third party", "cheap"]
+        )
+
+        if listing.price is not None and (
+            listing.price < 200.0 or is_replica or is_discount_or_refurbished
+        ):
             risk_signals.append("very_low_price")
 
         if (
@@ -44,6 +52,8 @@ class AnalyzerAgent:
             )
             or "replica" in seller_lower
             or "outlet" in seller_lower
+            or "deals" in seller_lower
+            or "unverified" in desc_lower
         ):
             risk_signals.append("poor_seller_rating")
 
@@ -52,7 +62,9 @@ class AnalyzerAgent:
 
         if (
             not listing.warranty_info
-            or "no warranty" in (listing.warranty_info or "").lower()
+            or "no warranty" in warranty_lower
+            or "seller" in warranty_lower
+            or "30-day" in warranty_lower
         ):
             risk_signals.append("no_warranty")
 

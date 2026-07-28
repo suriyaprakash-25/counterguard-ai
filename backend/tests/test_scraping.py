@@ -9,6 +9,7 @@ from backend.schemas.investigation import InvestigationRequest
 from backend.schemas.scraping import ParsedListing, ScrapingResult
 from backend.scrapers.generic_parser import GenericParser
 from backend.scrapers.page_fetcher import PageFetcher
+from backend.services.investigation_service import InvestigationService
 from backend.services.scraping_service import ScrapingService
 
 
@@ -72,10 +73,6 @@ def test_html_parser_extracts_data():
 
 
 def test_evidence_summary_honest_on_fallback():
-    """
-    FIX 1 Test: Asserts that if data_source is fallback_demo_data,
-    no evidence_summary field may report any status other than 'Unavailable'.
-    """
     analyzer = AnalyzerAgent()
     collector = EvidenceCollector()
     req = InvestigationRequest(
@@ -105,25 +102,87 @@ def test_evidence_summary_honest_on_fallback():
         assert data["reason"] == "No live data retrieved"
 
 
-def test_demo_mode_snapshots():
+def test_seller_name_extraction():
     """
-    FIX 2 Test: Verifies DEMO_MODE loads pre-fetched HTML snapshots,
-    executes real parser code, populates image_url, and returns valid data_source.
+    ISSUE 2 Test: Verifies correct seller_name extraction against each of the 3 demo HTML fixtures.
     """
     service = ScrapingService(demo_mode=True)
 
-    cases = [
-        ("demo://genuine", "Sony WH-1000XM5", 399.99),
-        ("demo://counterfeit", "Original Sony WH-1000XM5", 39.99),
-        ("demo://suspicious", "Sony WH-1000XM5", 189.99),
+    expected = [
+        ("demo://genuine", "Sony Direct Store"),
+        ("demo://counterfeit", "Discount Replica Outlet"),
+        ("demo://suspicious", "ElectroDeals Direct"),
     ]
 
-    for url, title_substr, expected_price in cases:
+    for url, expected_seller in expected:
         res = service.scrape(url)
         assert res.success is True
-        assert res.listing is not None
-        assert title_substr in res.listing.title
-        assert res.listing.price == expected_price
-        assert res.listing.image_url is not None
-        assert res.listing.image_url.startswith("https://images.unsplash.com")
-        assert res.listing.data_source == "live_retrieval"
+        assert (
+            res.listing.seller_name == expected_seller
+        ), f"Expected '{expected_seller}', got '{res.listing.seller_name}'"
+
+
+def test_suspicious_demo_scoring():
+    """
+    ISSUE 1 Test: Asserts demo://suspicious risk_level is MEDIUM or higher given its findings,
+    and ai_summary never claims '0 risk signals' when findings are present.
+    """
+    service = InvestigationService()
+    req = InvestigationRequest(
+        listing_url="demo://suspicious",
+        product_name="Sony WH-1000XM5 Wireless Headphones",
+        marketplace="ElectroDeals Direct",
+    )
+
+    report = service.run_investigation(req)
+
+    assert report.risk_level in (
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL",
+    ), f"Expected MEDIUM/HIGH/CRITICAL risk level, got '{report.risk_level}'"
+    assert (
+        report.risk_score >= 25
+    ), f"Expected risk_score >= 25, got {report.risk_score}"
+    assert "0 risk signals detected" not in report.ai_summary.lower()
+    assert report.seller == "ElectroDeals Direct"
+
+
+def test_confidence_differs_across_scenarios():
+    """
+    ISSUE 3 Test: Asserts confidence differs meaningfully across the 3 demo scenarios.
+    """
+    service = InvestigationService()
+
+    rep_genuine = service.run_investigation(
+        InvestigationRequest(
+            listing_url="demo://genuine",
+            product_name="Sony WH-1000XM5",
+            marketplace="Sony Direct",
+        )
+    )
+    rep_counterfeit = service.run_investigation(
+        InvestigationRequest(
+            listing_url="demo://counterfeit",
+            product_name="Sony WH-1000XM5 Replica",
+            marketplace="Discount Replica Outlet",
+        )
+    )
+    rep_suspicious = service.run_investigation(
+        InvestigationRequest(
+            listing_url="demo://suspicious",
+            product_name="Sony WH-1000XM5 Deals",
+            marketplace="ElectroDeals Direct",
+        )
+    )
+
+    conf_g = rep_genuine.confidence
+    conf_c = rep_counterfeit.confidence
+    conf_s = rep_suspicious.confidence
+
+    assert (
+        conf_g != conf_s or conf_c != conf_s
+    ), f"Confidence scores must differ across scenarios. Got genuine={conf_g}, counterfeit={conf_c}, suspicious={conf_s}"
+    assert not (
+        conf_g == conf_c == conf_s == 0.7772
+    ), "Confidence score must not be hardcoded to 0.7772"

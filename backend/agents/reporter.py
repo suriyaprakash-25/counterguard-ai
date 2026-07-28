@@ -51,7 +51,17 @@ class ReportGenerator:
             findings.append("No significant risk indicators found.")
 
         raw_score = risk.risk_score if risk else 50
-        raw_seller = analysis.brand or "Marketplace Seller"
+
+        # Extract actual seller_name from scraping_result (FIX ISSUE 2)
+        raw_seller = (
+            scraping_result.listing.seller_name
+            if (
+                scraping_result
+                and scraping_result.listing
+                and scraping_result.listing.seller_name
+            )
+            else (analysis.brand or "Marketplace Seller")
+        )
 
         data_source = (
             scraping_result.listing.data_source

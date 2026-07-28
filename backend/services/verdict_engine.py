@@ -2,7 +2,6 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from backend.services.confidence_engine import ConfidenceEngine
 from backend.services.product_canonicalizer import ProductCanonicalizer
 
 
@@ -72,6 +71,80 @@ class VerdictEngine:
     """
 
     @classmethod
+    def _calculate_findings_weight(cls, findings_list: List[str]) -> int:
+        findings_text = " ".join(findings_list).lower()
+        weight = 0
+        if any(
+            w in findings_text for w in ["replica", "clone", "fake", "copy", "99% new"]
+        ):
+            weight += 50
+        if any(
+            w in findings_text
+            for w in ["price anomaly", "price significantly lower", "price too low"]
+        ):
+            weight += 30
+        if any(
+            w in findings_text
+            for w in [
+                "seller risk",
+                "poor ratings",
+                "poor rating",
+                "unverified seller",
+                "reputation risk",
+            ]
+        ):
+            weight += 20
+        if any(
+            w in findings_text
+            for w in [
+                "warranty missing",
+                "no warranty",
+                "short warranty",
+                "seller provided warranty",
+            ]
+        ):
+            weight += 15
+        if any(
+            w in findings_text
+            for w in [
+                "unverified third-party",
+                "unverified distributor",
+                "refurbished",
+                "inconsistent brand",
+            ]
+        ):
+            weight += 15
+        if any(
+            w in findings_text
+            for w in [
+                "listing quality",
+                "low image count",
+                "one or fewer images",
+                "single image",
+            ]
+        ):
+            weight += 10
+        return weight
+
+    @classmethod
+    def _classify_verdict(cls, risk_score: int) -> tuple[str, str]:
+        if risk_score <= 20:
+            return "AUTHENTIC", "LOW"
+        elif risk_score <= 45:
+            return "LOW_RISK", "MEDIUM"
+        elif risk_score <= 75:
+            return "SUSPICIOUS", "HIGH"
+        return "LIKELY_COUNTERFEIT", "CRITICAL"
+
+    @classmethod
+    def _calculate_confidence(cls, final_verdict: str, num_negatives: int) -> float:
+        if final_verdict == "AUTHENTIC":
+            return round(min(0.95, max(0.85, 0.94 - (num_negatives * 0.04))), 4)
+        elif final_verdict in ("LIKELY_COUNTERFEIT", "CRITICAL"):
+            return round(min(0.98, max(0.88, 0.84 + (num_negatives * 0.03))), 4)
+        return round(min(0.84, max(0.68, 0.72 + (num_negatives * 0.02))), 4)
+
+    @classmethod
     def evaluate_risk(
         cls,
         raw_risk_score: int,
@@ -87,12 +160,10 @@ class VerdictEngine:
     ) -> UnifiedVerdict:
         """
         Evaluate and synchronize all assessment parameters into a single UnifiedVerdict.
-        If data_source is 'fallback_demo_data', forces INSUFFICIENT_DATA status.
         """
         evidence_list = evidence_list or []
         findings_list = findings_list or []
 
-        # Canonicalize Product Title & Brand
         canonical_product = ProductCanonicalizer.canonicalize(
             raw_title=product_name,
             brand_hint=brand_name,
@@ -106,175 +177,51 @@ class VerdictEngine:
             round(abs((avg_p - base_price) / avg_p) * 100) if avg_p > 0 else 20
         )
 
-        # Handle Fallback / Live Retrieval Failure
         if data_source == "fallback_demo_data":
-            final_verdict = "INSUFFICIENT_DATA"
-            risk_level = "INSUFFICIENT_DATA"
-            risk_score = 0
-            confidence = 0.50
-            conf_pct = 50
-            summary = f"INSUFFICIENT DATA: Live retrieval failed for '{canonical_product}' on {marketplace}. System operating on demo fallback data."
-            reasoning = (
-                f"Live HTTP fetch for listing URL on {marketplace} failed or was blocked by anti-bot protections. "
-                "To preserve analyst trust, verdict is set to INSUFFICIENT_DATA instead of fabricating a risk verdict."
-            )
-            data_warning = "Live retrieval failed for this listing URL. System operating in demo fallback mode."
-
-            recommended_actions = [
-                CategorizedRecommendationItem(
-                    category="Manual Review",
-                    priority="High",
-                    action=f"Retry investigation with an accessible live product URL or provider API for {marketplace}.",
-                    reason="Automated live retrieval returned fallback data.",
-                )
-            ]
-
-            comparison_matrix = UnifiedComparisonMatrix(
-                suspicious_listing=ComparisonListing(
-                    title=canonical_product,
-                    store=marketplace,
-                    price=base_price,
-                    currency="USD",
-                    warranty="Unknown / Unverified",
-                    seller_trust=f"{seller_name} (UNVERIFIED)",
-                    risk_score=0,
-                    authenticity="INSUFFICIENT DATA",
-                    domain="unverified",
-                ),
-                verified_product=ComparisonListing(
-                    title=canonical_product,
-                    store="Official Store",
-                    price=avg_p,
-                    currency="USD",
-                    warranty="Full Official Brand Warranty",
-                    seller_trust="Official Store",
-                    risk_score=0,
-                    authenticity="Authentic Reference",
-                    domain="official",
-                ),
+            return cls._build_fallback_verdict(
+                canonical_product,
+                marketplace,
+                seller_name,
+                base_price,
+                avg_p,
+                findings_list,
             )
 
-            return UnifiedVerdict(
-                final_verdict=final_verdict,
-                risk_score=risk_score,
-                risk_level=risk_level,
-                confidence=confidence,
-                confidence_percentage=conf_pct,
-                summary=summary,
-                reasoning=reasoning,
-                canonical_product_name=canonical_product,
-                marketplace=marketplace,
-                seller=seller_name,
-                price=base_price,
-                recommended_actions=recommended_actions,
-                comparison_matrix=comparison_matrix,
-                evidence_findings=findings_list or [summary],
-                data_confidence_warning=data_warning,
-            )
+        findings_weight = cls._calculate_findings_weight(findings_list)
+        risk_score = max(int(raw_risk_score), min(100, findings_weight))
 
-        # 1. Normalize Risk Score into strict bounds [0, 100]
-        risk_score = max(0, min(100, int(raw_risk_score)))
+        final_verdict, risk_level = cls._classify_verdict(risk_score)
 
-        # 2. Determine Unified Verdict Classification & Risk Level (Single Source of Truth)
-        if risk_score <= 20:
-            final_verdict = "AUTHENTIC"
-            risk_level = "LOW"
-        elif risk_score <= 40:
-            final_verdict = "LOW_RISK"
-            risk_level = "MEDIUM"
-        elif risk_score <= 70:
-            final_verdict = "SUSPICIOUS"
-            risk_level = "HIGH"
-        else:
-            final_verdict = "LIKELY_COUNTERFEIT"
-            risk_level = "CRITICAL"
-
-        # 4. Calculate Dynamic Evidence-Based Confidence
-        agent_votes = [
-            {"agent": "PriceAgent", "riskScore": max(0, min(100, risk_score + 4))},
-            {"agent": "SellerAgent", "riskScore": max(0, min(100, risk_score - 5))},
-            {"agent": "BrandAgent", "riskScore": max(0, min(100, risk_score + 2))},
-            {"agent": "ReviewAgent", "riskScore": max(0, min(100, risk_score - 3))},
+        negative_findings = [
+            f
+            for f in findings_list
+            if not ("no significant" in f.lower() or "verified" in f.lower())
         ]
-        conf_assessment = ConfidenceEngine.evaluate(
-            evidence_list=evidence_list,
-            agent_votes=agent_votes,
+        confidence = cls._calculate_confidence(final_verdict, len(negative_findings))
+        conf_pct = round(confidence * 100)
+
+        summary, reasoning = cls._generate_summary_and_reasoning(
+            final_verdict,
+            canonical_product,
+            marketplace,
+            seller_name,
+            base_price,
+            avg_p,
+            price_diff_pct,
+            risk_score,
+            conf_pct,
+            negative_findings,
         )
-        confidence = conf_assessment.aggregate_confidence
-        conf_pct = conf_assessment.aggregate_percentage
 
-        # 5. Generate Grounded AI Reasoning & Executive Summary (Zero Contradiction)
-        if final_verdict == "AUTHENTIC":
-            summary = (
-                f"Multi-agent swarm verified '{canonical_product}' as genuine on {marketplace}. "
-                f"Seller '{seller_name}' exhibits authentic registration metrics with 0 risk signals detected."
-            )
-            reasoning = (
-                f"The listing price (${base_price:.2f}) aligns within {price_diff_pct}% of the verified "
-                f"market baseline (${avg_p:.2f}). Seller '{seller_name}' passed WHOIS and trademark verification, "
-                f"resulting in a low risk score of {risk_score}/100 and {conf_pct}% confidence."
-            )
-        elif final_verdict == "LOW_RISK":
-            summary = (
-                f"Investigation of '{canonical_product}' on {marketplace} indicates low risk profile. "
-                f"Minor price variance detected but seller credentials remain within authorized parameters."
-            )
-            reasoning = (
-                f"The listing price (${base_price:.2f}) deviates by {price_diff_pct}% from the market average "
-                f"(${avg_p:.2f}), contributing to the risk score. Seller '{seller_name}' passed "
-                f"primary verification, maintaining a score of {risk_score}/100."
-            )
-        elif final_verdict == "SUSPICIOUS":
-            summary = (
-                f"Automated risk detection flagged '{canonical_product}' on {marketplace} due to "
-                f"price anomaly ({price_diff_pct}% below MSRP) and unverified seller storefront '{seller_name}'."
-            )
-            reasoning = (
-                f"The listing price (${base_price:.2f}) is approximately {price_diff_pct}% below the verified "
-                f"market average (${avg_p:.2f}). This anomaly contributed to the overall "
-                f"risk score of {risk_score}/100. Seller '{seller_name}' lacks official brand authorization."
-            )
-        else:  # LIKELY_COUNTERFEIT
-            summary = (
-                f"CRITICAL THREAT: '{canonical_product}' on {marketplace} is classified as LIKELY COUNTERFEIT. "
-                f"Severe price suppression ({price_diff_pct}% below MSRP) and suspicious merchant activity detected."
-            )
-            reasoning = (
-                f"The listing price (${base_price:.2f}) is {price_diff_pct}% below the verified market average "
-                f"(${avg_p:.2f}), contributing to the critical risk score of {risk_score}/100. "
-                f"Seller '{seller_name}' triggered negative WHOIS and reverse image matching flags."
-            )
+        recommended_actions = cls._build_recommendations(
+            final_verdict,
+            risk_level,
+            risk_score,
+            seller_name,
+            marketplace,
+            len(negative_findings),
+        )
 
-        # 6. Synchronized Recommendations
-        if final_verdict in ("AUTHENTIC", "LOW_RISK"):
-            recommended_actions = [
-                CategorizedRecommendationItem(
-                    category="Monitor",
-                    priority="Low",
-                    action=f"Listing is verified authentic. Continue periodic monitoring of {marketplace}.",
-                    reason="Product specs and seller identity meet all authentic baseline criteria.",
-                )
-            ]
-        elif final_verdict == "SUSPICIOUS":
-            recommended_actions = [
-                CategorizedRecommendationItem(
-                    category="Manual Review",
-                    priority="High",
-                    action=f"Assign brand analyst to inspect physical packaging and seller '{seller_name}'.",
-                    reason=f"Risk score of {risk_score}/100 with {price_diff_pct}% price suppression.",
-                )
-            ]
-        else:  # LIKELY_COUNTERFEIT
-            recommended_actions = [
-                CategorizedRecommendationItem(
-                    category="Immediate",
-                    priority="High",
-                    action=f"Initiate formal IP infringement takedown request against seller '{seller_name}' on {marketplace}.",
-                    reason=f"High risk score of {risk_score}/100 classified as LIKELY COUNTERFEIT.",
-                )
-            ]
-
-        # 7. Comparison Matrix
         comparison_matrix = UnifiedComparisonMatrix(
             suspicious_listing=ComparisonListing(
                 title=canonical_product,
@@ -282,12 +229,12 @@ class VerdictEngine:
                 price=base_price,
                 currency="USD",
                 warranty="Unverified / No Warranty"
-                if risk_score > 40
+                if risk_score > 30
                 else "Standard Warranty",
                 seller_trust=f"{seller_name} ({risk_level} RISK)",
                 risk_score=risk_score,
                 authenticity=final_verdict.replace("_", " "),
-                domain="unverified" if risk_score > 40 else "verified",
+                domain="unverified" if risk_score > 30 else "verified",
             ),
             verified_product=ComparisonListing(
                 title=canonical_product,
@@ -319,3 +266,130 @@ class VerdictEngine:
             evidence_findings=findings_list or [summary],
             data_confidence_warning=None,
         )
+
+    @classmethod
+    def _build_fallback_verdict(
+        cls,
+        canonical_product,
+        marketplace,
+        seller_name,
+        base_price,
+        avg_p,
+        findings_list,
+    ):
+        return UnifiedVerdict(
+            final_verdict="INSUFFICIENT_DATA",
+            risk_score=0,
+            risk_level="INSUFFICIENT_DATA",
+            confidence=0.5000,
+            confidence_percentage=50,
+            summary=f"INSUFFICIENT DATA: Live retrieval failed for '{canonical_product}' on {marketplace}. System operating on demo fallback data.",
+            reasoning="Live HTTP fetch for listing URL failed or was blocked by anti-bot protections. Verdict set to INSUFFICIENT_DATA.",
+            canonical_product_name=canonical_product,
+            marketplace=marketplace,
+            seller=seller_name,
+            price=base_price,
+            recommended_actions=[
+                CategorizedRecommendationItem(
+                    category="Manual Review",
+                    priority="High",
+                    action=f"Retry investigation with an accessible live product URL or provider API for {marketplace}.",
+                    reason="Automated live retrieval returned fallback data.",
+                )
+            ],
+            comparison_matrix=UnifiedComparisonMatrix(
+                suspicious_listing=ComparisonListing(
+                    title=canonical_product,
+                    store=marketplace,
+                    price=base_price,
+                    currency="USD",
+                    warranty="Unknown / Unverified",
+                    seller_trust=f"{seller_name} (UNVERIFIED)",
+                    risk_score=0,
+                    authenticity="INSUFFICIENT DATA",
+                    domain="unverified",
+                ),
+                verified_product=ComparisonListing(
+                    title=canonical_product,
+                    store="Official Store",
+                    price=avg_p,
+                    currency="USD",
+                    warranty="Full Official Brand Warranty",
+                    seller_trust="Official Store",
+                    risk_score=0,
+                    authenticity="Authentic Reference",
+                    domain="official",
+                ),
+            ),
+            evidence_findings=findings_list
+            or [f"Live retrieval failed for {marketplace}"],
+            data_confidence_warning="Live retrieval failed for this listing URL. System operating in demo fallback mode.",
+        )
+
+    @classmethod
+    def _generate_summary_and_reasoning(
+        cls,
+        final_verdict,
+        canonical_product,
+        marketplace,
+        seller_name,
+        base_price,
+        avg_p,
+        price_diff_pct,
+        risk_score,
+        conf_pct,
+        negative_findings,
+    ):
+        if final_verdict == "AUTHENTIC":
+            if negative_findings:
+                summary = f"Multi-agent evaluation of '{canonical_product}' on {marketplace} indicates authentic status (risk score {risk_score}/100), with minor observations: {negative_findings[0]}."
+            else:
+                summary = f"Multi-agent swarm verified '{canonical_product}' as genuine on {marketplace}. Seller '{seller_name}' meets authentic baseline metrics with 0 risk signals detected."
+            reasoning = f"The listing price (${base_price:.2f}) aligns within {price_diff_pct}% of the market baseline (${avg_p:.2f}). Seller '{seller_name}' passed baseline verification with risk score {risk_score}/100 and {conf_pct}% confidence."
+        elif final_verdict == "LOW_RISK":
+            summary = f"Investigation of '{canonical_product}' on {marketplace} indicates MEDIUM risk profile (risk score {risk_score}/100). Flagged risk factors: {', '.join(negative_findings[:3])}."
+            reasoning = f"The listing price (${base_price:.2f}) deviates from the market average (${avg_p:.2f}). Seller '{seller_name}' triggered {len(negative_findings)} risk indicators resulting in a risk score of {risk_score}/100."
+        elif final_verdict == "SUSPICIOUS":
+            summary = f"Automated risk detection flagged '{canonical_product}' on {marketplace} as SUSPICIOUS (risk score {risk_score}/100). Risk signals detected: {', '.join(negative_findings[:3])}."
+            reasoning = f"Listing price (${base_price:.2f}) and merchant storefront '{seller_name}' triggered multiple risk signals. Total risk score: {risk_score}/100 with {conf_pct}% assessment confidence."
+        else:
+            summary = f"CRITICAL THREAT: '{canonical_product}' on {marketplace} is classified as LIKELY COUNTERFEIT (risk score {risk_score}/100). Severe risk signals detected: {', '.join(negative_findings[:3])}."
+            reasoning = f"The listing price (${base_price:.2f}) is significantly below market average (${avg_p:.2f}). Merchant '{seller_name}' triggered critical counterfeit indicators."
+        return summary, reasoning
+
+    @classmethod
+    def _build_recommendations(
+        cls,
+        final_verdict,
+        risk_level,
+        risk_score,
+        seller_name,
+        marketplace,
+        num_negatives,
+    ):
+        if final_verdict in ("AUTHENTIC", "LOW_RISK") and risk_score <= 20:
+            return [
+                CategorizedRecommendationItem(
+                    category="Monitor",
+                    priority="Low",
+                    action=f"Listing is verified authentic. Continue periodic monitoring of {marketplace}.",
+                    reason="Product specs and seller identity meet authentic baseline criteria.",
+                )
+            ]
+        elif risk_level in ("MEDIUM", "HIGH"):
+            return [
+                CategorizedRecommendationItem(
+                    category="Manual Review",
+                    priority="High",
+                    action=f"Assign brand analyst to inspect seller '{seller_name}' on {marketplace}.",
+                    reason=f"Risk score of {risk_score}/100 with {num_negatives} risk signals.",
+                )
+            ]
+        return [
+            CategorizedRecommendationItem(
+                category="Immediate",
+                priority="High",
+                action=f"Initiate formal IP infringement takedown request against seller '{seller_name}' on {marketplace}.",
+                reason=f"High risk score of {risk_score}/100 classified as LIKELY COUNTERFEIT.",
+            )
+        ]

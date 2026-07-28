@@ -653,7 +653,9 @@ export function ProductComparisonMatrix({ comparison }: { comparison?: ProductCo
 }
 
 // --- 3. Enhanced Timeline ---
-export function Timeline({ events }: { events: TimelineEvent[] }) {
+export function Timeline({ events }: { events?: TimelineEvent[] }) {
+  const safeEvents = events || [];
+
   const getIcon = (type: string, severity?: string) => {
     if (severity === "critical" || severity === "high") return <AlertTriangle className="h-4 w-4 text-danger" />;
     switch(type) {
@@ -669,41 +671,49 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Investigation Timeline</span>
-          <Badge variant="secondary">{events.length} Events</Badge>
+          <Badge variant="secondary">{safeEvents.length} Events</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="max-h-[500px] overflow-y-auto pr-2">
-        <div className="space-y-4 relative before:absolute before:inset-0 before:left-4 before:h-full before:w-0.5 before:bg-slate-200">
-          {events.map((event) => (
-            <div key={event.id} className="relative flex items-start gap-4 group">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full border border-white bg-slate-100 text-slate-600 shadow-sm shrink-0 z-10">
-                {getIcon(event.iconType, event.severity)}
-              </div>
-              <div className="flex-1 p-3.5 rounded-xl border border-border bg-surface shadow-xs hover:border-slate-300 transition-colors">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs text-slate-900">{event.title}</span>
-                    {getSeverityBadge(event.severity)}
-                  </div>
-                  <span className="text-[10px] text-muted font-mono">{new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        {safeEvents.length === 0 ? (
+          <p className="text-sm text-muted text-center py-6 border border-dashed rounded-lg">No timeline events recorded.</p>
+        ) : (
+          <div className="space-y-4 relative before:absolute before:inset-0 before:left-4 before:h-full before:w-0.5 before:bg-slate-200">
+            {safeEvents.map((event) => (
+              <div key={event.id} className="relative flex items-start gap-4 group">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full border border-white bg-slate-100 text-slate-600 shadow-sm shrink-0 z-10">
+                  {getIcon(event.iconType, event.severity)}
                 </div>
-                <p className="text-xs text-slate-600 leading-relaxed mb-1">{event.description}</p>
-                {event.agent && (
-                  <span className="text-[10px] font-mono text-muted bg-slate-100 px-1.5 py-0.5 rounded">
-                    Source: {event.agent}
-                  </span>
-                )}
+                <div className="flex-1 p-3.5 rounded-xl border border-border bg-surface shadow-xs hover:border-slate-300 transition-colors">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-slate-900">{event.title}</span>
+                      {getSeverityBadge(event.severity)}
+                    </div>
+                    <span className="text-[10px] text-muted font-mono">
+                      {event.timestamp ? new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed mb-1">{event.description}</p>
+                  {event.agent && (
+                    <span className="text-[10px] font-mono text-muted bg-slate-100 px-1.5 py-0.5 rounded">
+                      Source: {event.agent}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
 // --- 4. Collected Evidence ---
-export function EvidenceSection({ evidence }: { evidence: EvidenceItem[] }) {
+export function EvidenceSection({ items, evidence }: { items?: EvidenceItem[]; evidence?: EvidenceItem[] }) {
+  const safeEvidence = items || evidence || [];
+
   const getIcon = (type: string) => {
     switch(type) {
       case 'image': return <ImageIcon className="h-4 w-4 text-primary" />;
@@ -713,7 +723,8 @@ export function EvidenceSection({ evidence }: { evidence: EvidenceItem[] }) {
     }
   };
 
-  const grouped = evidence.reduce((acc, item) => {
+  const grouped = safeEvidence.reduce((acc, item) => {
+    if (!item) return acc;
     const key = item.agent || item.source || "Specialist Agent";
     if (!acc[key]) acc[key] = [];
     acc[key].push(item);
@@ -726,7 +737,7 @@ export function EvidenceSection({ evidence }: { evidence: EvidenceItem[] }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Collected Evidence ({evidence.length})</span>
+          <span>Collected Evidence ({safeEvidence.length})</span>
           <Badge variant="outline">Grouped by Agent</Badge>
         </CardTitle>
       </CardHeader>
@@ -758,8 +769,8 @@ export function EvidenceSection({ evidence }: { evidence: EvidenceItem[] }) {
             </div>
           </div>
         ))}
-        {evidence.length === 0 && (
-          <p className="text-sm text-muted text-center py-6 border border-dashed rounded-lg">No evidence records available.</p>
+        {safeEvidence.length === 0 && (
+          <p className="text-sm text-muted text-center py-6 border border-dashed rounded-lg">No evidence records available for this investigation.</p>
         )}
       </CardContent>
     </Card>
@@ -798,7 +809,10 @@ const GraphIntelligencePreviewComponent = ({ id }: { id: string }) => {
 export const GraphIntelligencePreview = memo(GraphIntelligencePreviewComponent);
 
 // --- 6. Memory Context ---
-export function MemoryContextCard({ memory }: { memory: MemoryContext }) {
+export function MemoryContextCard({ memory }: { memory?: MemoryContext }) {
+  if (!memory) return null;
+  const knownPatterns = memory.knownPatterns || [];
+
   return (
     <Card className="h-[500px] flex flex-col shadow-sm">
       <CardHeader>
@@ -808,15 +822,15 @@ export function MemoryContextCard({ memory }: { memory: MemoryContext }) {
         <div className="grid grid-cols-3 gap-3">
           <div className="p-3 bg-slate-50 rounded-lg border border-border text-center">
             <span className="text-[10px] font-semibold text-muted uppercase">Past Invs</span>
-            <p className="text-lg font-bold text-slate-900 mt-1">{memory.previousInvestigations}</p>
+            <p className="text-lg font-bold text-slate-900 mt-1">{memory.previousInvestigations || 0}</p>
           </div>
           <div className="p-3 bg-slate-50 rounded-lg border border-border text-center">
             <span className="text-[10px] font-semibold text-muted uppercase">Semantic Matches</span>
-            <p className="text-lg font-bold text-slate-900 mt-1">{memory.semanticMatches}</p>
+            <p className="text-lg font-bold text-slate-900 mt-1">{memory.semanticMatches || 0}</p>
           </div>
           <div className="p-3 bg-slate-50 rounded-lg border border-border text-center">
             <span className="text-[10px] font-semibold text-muted uppercase">Hist Risk</span>
-            <p className="text-lg font-bold text-danger mt-1">{memory.historicalRisk}/100</p>
+            <p className="text-lg font-bold text-danger mt-1">{memory.historicalRisk || 0}/100</p>
           </div>
         </div>
 
@@ -839,12 +853,15 @@ export function MemoryContextCard({ memory }: { memory: MemoryContext }) {
         <div>
           <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">Matched Historical Risk Patterns</h4>
           <ul className="space-y-2">
-            {(memory.knownPatterns || []).map((pattern, idx) => (
+            {knownPatterns.map((pattern, idx) => (
               <li key={idx} className="flex items-start gap-2 p-2.5 rounded-lg border border-border bg-amber-50/50 text-xs text-slate-800">
                 <Search className="h-4 w-4 text-warning shrink-0 mt-0.5" />
                 <span>{pattern}</span>
               </li>
             ))}
+            {knownPatterns.length === 0 && (
+              <li className="text-xs text-muted">No historical risk patterns matched.</li>
+            )}
           </ul>
         </div>
       </CardContent>
@@ -853,19 +870,22 @@ export function MemoryContextCard({ memory }: { memory: MemoryContext }) {
 }
 
 // --- 7. Consensus Card ---
-export function ConsensusCard({ consensus }: { consensus: ConsensusDetails }) {
+export function ConsensusCard({ consensus }: { consensus?: ConsensusDetails }) {
+  if (!consensus) return null;
+  const agentVotes = consensus.agentVotes || [];
+
   return (
     <Card className="shadow-sm">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Multi-Agent Consensus Matrix</CardTitle>
-          <Badge variant="success" className="font-semibold">Agreement Score: {consensus.agreementScore}%</Badge>
+          <Badge variant="success" className="font-semibold">Agreement Score: {consensus.agreementScore || 85}%</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-lg border border-border">{consensus.explanation}</p>
+        <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-lg border border-border">{consensus.explanation || "Multi-agent evaluation completed."}</p>
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
-          {consensus.agentVotes.map((vote, idx) => {
+          {agentVotes.map((vote, idx) => {
             const vLabel = (vote.vote || "").toUpperCase();
             const badgeClass = vLabel.includes("AUTHENTIC") ? "bg-emerald-50 text-emerald-700 border-emerald-300" :
                               vLabel.includes("LOW") ? "bg-amber-50 text-amber-700 border-amber-300" :

@@ -3,24 +3,23 @@ from backend.orchestrator.builder import build_graph
 
 def test_orchestrator_automation_nodes():
     """
-    Verifies that the orchestrator graph includes the new automation nodes.
+    Verifies that the orchestrator graph compiles with the streamlined pipeline.
     """
     graph = build_graph()
 
-    # Check that alert node is present
-    assert "alert" in graph.nodes
-    assert "save_memory" in graph.nodes
+    # Check core pipeline nodes are present
+    assert "scraper" in graph.nodes
+    assert "analyzer" in graph.nodes
+    assert "collector" in graph.nodes
+    assert "assessor" in graph.nodes
+    assert "planner" in graph.nodes
+    assert "coordinator" in graph.nodes
+    assert "trusted_product" in graph.nodes
+    assert "reporter" in graph.nodes
 
-    # Check routing structure
+    # Assert that reporter routes directly to END
     edges = graph.edges
-
-    # Assert that reporter goes to save_memory, and save_memory goes to alert
-    has_save_memory_to_alert = any(
-        source == "save_memory" and target == "alert" for source, target in edges
+    has_reporter_to_end = any(
+        source == "reporter" and target == "__end__" for source, target in edges
     )
-    assert has_save_memory_to_alert
-
-    has_alert_to_end = any(
-        source == "alert" and target == "__end__" for source, target in edges
-    )
-    assert has_alert_to_end
+    assert has_reporter_to_end

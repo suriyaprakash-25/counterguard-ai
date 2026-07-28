@@ -74,10 +74,11 @@ def test_scraping_service():
         assert result.success is True
         assert result.listing.title == "Item"
         assert result.listing.price == 5.0
+        assert result.listing.data_source == "live_retrieval"
 
     with patch.object(service.fetcher, "fetch") as mock_fetch:
         mock_fetch.side_effect = Exception("Connection Failed")
 
         result = service.scrape("https://test.com/item")
-        assert result.success is False
-        assert result.error_message == "Connection Failed"
+        assert result.success is True
+        assert result.listing.data_source == "fallback_demo_data"

@@ -1,6 +1,6 @@
+from backend.domain_types import JSONDict
 from backend.exceptions import InvalidListingError
 from backend.state import InvestigationState
-from backend.types import JSONDict
 
 
 class InvestigationFactory:

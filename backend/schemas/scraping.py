@@ -17,6 +17,7 @@ class ParsedListing(BaseModel):
     currency: Optional[str] = None
     shipping: Optional[str] = None
     category: Optional[str] = None
+    data_source: str = "live_retrieval"  # "live_retrieval" | "fallback_demo_data"
 
 
 class ScrapingResult(BaseModel):

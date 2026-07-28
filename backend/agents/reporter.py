@@ -8,6 +8,7 @@ from backend.schemas.investigation import (
     RiskAssessment,
 )
 from backend.schemas.llm_models import AIInvestigationResult
+from backend.schemas.scraping import ScrapingResult
 from backend.services.consistency_validator import ConsistencyValidator
 from backend.services.product_canonicalizer import ProductCanonicalizer
 from backend.services.verdict_engine import VerdictEngine
@@ -21,20 +22,19 @@ class ReportGenerator:
         risk: RiskAssessment,
         ai_result: Optional[AIInvestigationResult] = None,
         recommended_products: Optional[List[Dict[str, Any]]] = None,
+        scraping_result: Optional[ScrapingResult] = None,
     ) -> InvestigationReport:
         """
         Synthesizes findings into a unified, zero-contradiction human-readable report.
         Uses VerdictEngine & ConsistencyValidator as single source of truth.
         """
-        # Canonicalize product name
         canonical_title = ProductCanonicalizer.canonicalize(
             raw_title=analysis.title,
             brand_hint=analysis.brand,
         )
 
-        # Collect raw evidence strings
         findings = []
-        se = evidence.structured_evidence
+        se = evidence.structured_evidence if evidence else {}
         if "price" in se and se["price"].get("status") == "Suspicious":
             findings.append(f"Price Anomaly: {se['price'].get('reason')}")
         if "seller" in se and se["seller"].get("status") in ["Poor", "Missing"]:
@@ -53,6 +53,12 @@ class ReportGenerator:
         raw_score = risk.risk_score if risk else 50
         raw_seller = analysis.brand or "Marketplace Seller"
 
+        data_source = (
+            scraping_result.listing.data_source
+            if scraping_result and scraping_result.listing
+            else "live_retrieval"
+        )
+
         # Generate Unified Verdict
         unified = VerdictEngine.evaluate_risk(
             raw_risk_score=raw_score,
@@ -63,23 +69,25 @@ class ReportGenerator:
             evidence_list=[{"detail": f} for f in findings],
             findings_list=findings,
             brand_name=analysis.brand,
+            data_source=data_source,
         )
 
-        # Run pre-persistence consistency validation & repair
-        unified, _repaired = ConsistencyValidator.validate_and_repair(
-            report_data={
-                "verdict": unified.final_verdict,
-                "risk_level": unified.risk_level,
-                "summary": unified.summary,
-                "reasoning": unified.reasoning,
-            },
-            raw_risk_score=unified.risk_score,
-            product_name=canonical_title,
-            marketplace=analysis.marketplace,
-            seller=raw_seller,
-            price=analysis.price,
-            findings_list=findings,
-        )
+        # Run pre-persistence consistency validation & repair if not fallback mode
+        if data_source != "fallback_demo_data":
+            unified, _repaired = ConsistencyValidator.validate_and_repair(
+                report_data={
+                    "verdict": unified.final_verdict,
+                    "risk_level": unified.risk_level,
+                    "summary": unified.summary,
+                    "reasoning": unified.reasoning,
+                },
+                raw_risk_score=unified.risk_score,
+                product_name=canonical_title,
+                marketplace=analysis.marketplace,
+                seller=raw_seller,
+                price=analysis.price,
+                findings_list=findings,
+            )
 
         rec_action = (
             unified.recommended_actions[0].action
@@ -95,7 +103,7 @@ class ReportGenerator:
             price=analysis.price,
             risk_score=unified.risk_score,
             risk_level=unified.risk_level,
-            evidence_summary=evidence.structured_evidence,
+            evidence_summary=se,
             findings=unified.evidence_findings,
             recommendation=rec_action,
             confidence=unified.confidence,
@@ -103,4 +111,5 @@ class ReportGenerator:
             ai_reasoning=unified.reasoning,
             investigation_timestamp=datetime.now(timezone.utc).isoformat(),
             recommended_products=recommended_products or [],
+            data_confidence_warning=unified.data_confidence_warning,
         )

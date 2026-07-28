@@ -48,3 +48,4 @@ class InvestigationReport(BaseModel):
     ai_reasoning: str = Field(default="")
     investigation_timestamp: str
     recommended_products: List[Dict[str, Any]] = Field(default_factory=list)
+    data_confidence_warning: Optional[str] = None

@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from backend.types import EvidenceEvent, JSONDict
+from backend.domain_types import EvidenceEvent, JSONDict
 
 
 class InvestigationResponse(BaseModel):

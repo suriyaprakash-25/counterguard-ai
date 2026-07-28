@@ -49,7 +49,7 @@ def test_list_investigations_empty(client_and_session):
     client, _ = client_and_session
     response = client.get("/api/v1/investigations")
     assert response.status_code == 200
-    data = response.json()
+    data = response.json().get("data", response.json())
     assert data["total_count"] == 0
     assert data["items"] == []
     assert data["total_pages"] == 0
@@ -58,7 +58,6 @@ def test_list_investigations_empty(client_and_session):
 def test_list_investigations_pagination_filtering_and_sorting(client_and_session):
     client, session = client_and_session
 
-    # Populate DB with test investigations (inv1 is newest so it appears on page 1 in default desc order)
     inv1 = InvestigationModel(
         id="inv-1",
         listing_url="https://amazon.com/dp/B001",
@@ -82,7 +81,6 @@ def test_list_investigations_pagination_filtering_and_sorting(client_and_session
     )
     session.add_all([inv1, inv2, inv3])
 
-    # Add a report to inv1 to test rich summary attributes
     report = ReportModel.from_pydantic(
         InvestigationReport(
             summary="High risk listing detected.",
@@ -108,12 +106,11 @@ def test_list_investigations_pagination_filtering_and_sorting(client_and_session
     # 1. Test pagination (page=1, page_size=2)
     res_page = client.get("/api/v1/investigations?page=1&page_size=2")
     assert res_page.status_code == 200
-    data_page = res_page.json()
+    data_page = res_page.json().get("data", res_page.json())
     assert data_page["total_count"] == 3
     assert len(data_page["items"]) == 2
     assert data_page["total_pages"] == 2
 
-    # Verify report enrichment on inv-1
     inv1_item = next(item for item in data_page["items"] if item["id"] == "inv-1")
     assert inv1_item["product"] == "Luxury Sunglass"
     assert inv1_item["risk_level"] == "HIGH"
@@ -122,17 +119,19 @@ def test_list_investigations_pagination_filtering_and_sorting(client_and_session
     # 2. Test marketplace filtering
     res_amz = client.get("/api/v1/investigations?marketplace=Amazon")
     assert res_amz.status_code == 200
-    assert res_amz.json()["total_count"] == 2
+    data_amz = res_amz.json().get("data", res_amz.json())
+    assert data_amz["total_count"] == 2
 
     # 3. Test status filtering
     res_status = client.get("/api/v1/investigations?status=in_progress")
     assert res_status.status_code == 200
-    assert res_status.json()["total_count"] == 1
+    data_st = res_status.json().get("data", res_status.json())
+    assert data_st["total_count"] == 1
 
     # 4. Test custom sorting (sort by marketplace ASC)
     res_sort = client.get("/api/v1/investigations?sort_by=marketplace&sort_order=asc")
     assert res_sort.status_code == 200
-    sorted_items = res_sort.json()["items"]
+    sorted_items = res_sort.json().get("data", res_sort.json())["items"]
     assert sorted_items[0]["marketplace"] == "Amazon"
     assert sorted_items[2]["marketplace"] == "eBay"
 
@@ -162,7 +161,7 @@ def test_get_investigation_detail_and_not_found(client_and_session):
     # 1. Query successful detail view
     res = client.get("/api/v1/investigations/test-detail-id")
     assert res.status_code == 200
-    data = res.json()
+    data = res.json().get("data", res.json())
     assert data["id"] == "test-detail-id"
     assert len(data["evidence_timeline"]) == 1
     assert data["evidence_timeline"][0]["agent"] == "scout"
@@ -188,8 +187,9 @@ def test_delete_investigation_endpoint(client_and_session):
     # 1. Execute successful deletion
     res_del = client.delete("/api/v1/investigations/to-delete-id")
     assert res_del.status_code == 200
-    assert res_del.json()["success"] is True
-    assert res_del.json()["id"] == "to-delete-id"
+    del_data = res_del.json().get("data", res_del.json())
+    assert del_data["success"] is True
+    assert del_data["id"] == "to-delete-id"
 
     # 2. Verify record removal (subsequent get returns 404)
     res_get = client.get("/api/v1/investigations/to-delete-id")

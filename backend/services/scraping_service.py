@@ -14,7 +14,7 @@ class ScrapingService:
     def scrape(self, url: str) -> ScrapingResult:
         """
         Coordinates fetching and parsing of a given URL.
-        Returns a structured ScrapingResult with robust fallback handling to prevent pipeline failures.
+        Returns a structured ScrapingResult with explicit fallback data_source tracking.
         """
         logger.info(f"Starting scraping process for: {url}")
         try:
@@ -31,6 +31,7 @@ class ScrapingService:
                     marketplace="Global",
                     description=f"Search results for {product} by {brand}",
                     images_count=1,
+                    data_source="fallback_demo_data",
                 )
                 return ScrapingResult(
                     success=True,
@@ -42,6 +43,7 @@ class ScrapingService:
                 html = self.fetcher.fetch(url)
                 parser = ParserFactory.get_parser(url)
                 parsed_listing = parser.parse(html, url)
+                parsed_listing.data_source = "live_retrieval"
                 return ScrapingResult(
                     success=True, listing=parsed_listing, raw_html=html
                 )
@@ -74,6 +76,7 @@ class ScrapingService:
                     marketplace=marketplace,
                     description=f"Automated intelligence evaluation for listing {url}",
                     images_count=1,
+                    data_source="fallback_demo_data",
                 )
                 return ScrapingResult(
                     success=True,
@@ -91,6 +94,7 @@ class ScrapingService:
                 marketplace="Global",
                 description=f"Evaluation for listing {url}",
                 images_count=1,
+                data_source="fallback_demo_data",
             )
             return ScrapingResult(
                 success=True,

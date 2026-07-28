@@ -251,6 +251,29 @@ export function resolveInvestigationTitle(dto: any): string {
   return `Investigation ${(dto.id || '').substring(0, 8)}`;
 }
 
+export function canonicalizeProductTitle(title: string): string {
+  if (!title) return '';
+  const lower = title.toLowerCase().trim();
+  const canonicalMap: Record<string, string> = {
+    'wh1000xm5': 'Sony WH-1000XM5',
+    'wh-1000xm5': 'Sony WH-1000XM5',
+    'cmf buds 2a': 'Nothing CMF Buds 2a',
+    'cmf buds': 'Nothing CMF Buds',
+    'nothing phone 2a': 'Nothing Phone (2a)',
+    'iphone 15 pro max': 'Apple iPhone 15 Pro Max',
+    'iphone 15 pro': 'Apple iPhone 15 Pro',
+    'airpods pro 2': 'Apple AirPods Pro (2nd Gen)',
+    'galaxy s25 ultra': 'Samsung Galaxy S25 Ultra',
+    'bose qc45': 'Bose QuietComfort 45'
+  };
+
+  for (const [key, val] of Object.entries(canonicalMap)) {
+    if (lower.includes(key)) return val;
+  }
+
+  return title;
+}
+
 function isRawUrl(text: string): boolean {
   if (!text) return false;
   // Looks like a URL path with query parameters

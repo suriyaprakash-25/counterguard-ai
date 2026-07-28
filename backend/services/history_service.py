@@ -16,6 +16,7 @@ from backend.schemas.history import (
     InvestigationListResponse,
 )
 from backend.services.price_intelligence_service import PriceIntelligenceService
+from backend.services.product_canonicalizer import ProductCanonicalizer
 from backend.services.product_search_service import ProductSearchService
 from backend.services.target_normalization_service import TargetNormalizationService
 
@@ -353,7 +354,9 @@ class InvestigationHistoryService:
             if report_model:
                 recommended_products = report_model.get_recommended_products_list()
 
-            raw_prod = report_model.product if report_model else inv.listing_url
+            raw_prod = ProductCanonicalizer.canonicalize(
+                report_model.product if report_model else inv.listing_url
+            )
             raw_price = report_model.price if report_model else 0.0
 
             if not recommended_products:
@@ -363,6 +366,11 @@ class InvestigationHistoryService:
                 recommended_products = [
                     r.model_dump(mode="json") for r in retrieved_models
                 ]
+
+            for rp in recommended_products:
+                if isinstance(rp, dict):
+                    raw_pname = rp.get("product_name") or rp.get("title") or ""
+                    rp["product_name"] = ProductCanonicalizer.canonicalize(raw_pname)
 
             product_comparison = None
             if recommended_products:

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from backend.schemas.investigation import (
     AnalyzerResult,
@@ -8,6 +8,9 @@ from backend.schemas.investigation import (
     RiskAssessment,
 )
 from backend.schemas.llm_models import AIInvestigationResult
+from backend.services.consistency_validator import ConsistencyValidator
+from backend.services.product_canonicalizer import ProductCanonicalizer
+from backend.services.verdict_engine import VerdictEngine
 
 
 class ReportGenerator:
@@ -20,27 +23,26 @@ class ReportGenerator:
         recommended_products: Optional[List[Dict[str, Any]]] = None,
     ) -> InvestigationReport:
         """
-        Synthesizes the findings into a final human-readable report.
+        Synthesizes findings into a unified, zero-contradiction human-readable report.
+        Uses VerdictEngine & ConsistencyValidator as single source of truth.
         """
+        # Canonicalize product name
+        canonical_title = ProductCanonicalizer.canonicalize(
+            raw_title=analysis.title,
+            brand_hint=analysis.brand,
+        )
+
+        # Collect raw evidence strings
         findings = []
-
-        if risk.risk_score >= 80:
-            findings.append("High probability of counterfeit or policy violation.")
-        elif risk.risk_score >= 50:
-            findings.append(
-                "Multiple suspicious indicators detected. Manual review advised."
-            )
-
-        # Add specific findings based on structured evidence
         se = evidence.structured_evidence
-        if "price" in se and se["price"]["status"] == "Suspicious":
-            findings.append(f"Price Anomaly: {se['price']['reason']}")
-        if "seller" in se and se["seller"]["status"] in ["Poor", "Missing"]:
-            findings.append(f"Seller Risk: {se['seller']['reason']}")
-        if "images" in se and se["images"]["status"] == "Poor":
-            findings.append(f"Listing Quality: {se['images']['reason']}")
-        if "warranty" in se and se["warranty"]["status"] == "Missing":
-            findings.append(f"Warranty: {se['warranty']['reason']}")
+        if "price" in se and se["price"].get("status") == "Suspicious":
+            findings.append(f"Price Anomaly: {se['price'].get('reason')}")
+        if "seller" in se and se["seller"].get("status") in ["Poor", "Missing"]:
+            findings.append(f"Seller Risk: {se['seller'].get('reason')}")
+        if "images" in se and se["images"].get("status") == "Poor":
+            findings.append(f"Listing Quality: {se['images'].get('reason')}")
+        if "warranty" in se and se["warranty"].get("status") == "Missing":
+            findings.append(f"Warranty: {se['warranty'].get('reason')}")
 
         if ai_result and ai_result.suspicious_indicators:
             findings.extend(ai_result.suspicious_indicators)
@@ -48,28 +50,57 @@ class ReportGenerator:
         if not findings:
             findings.append("No significant risk indicators found.")
 
-        recommendation = (
-            "Immediate takedown recommended."
-            if risk.risk_level == "HIGH"
+        raw_score = risk.risk_score if risk else 50
+        raw_seller = analysis.brand or "Marketplace Seller"
+
+        # Generate Unified Verdict
+        unified = VerdictEngine.evaluate_risk(
+            raw_risk_score=raw_score,
+            product_name=canonical_title,
+            marketplace=analysis.marketplace,
+            seller_name=raw_seller,
+            price=analysis.price,
+            evidence_list=[{"detail": f} for f in findings],
+            findings_list=findings,
+            brand_name=analysis.brand,
+        )
+
+        # Run pre-persistence consistency validation & repair
+        unified, _repaired = ConsistencyValidator.validate_and_repair(
+            report_data={
+                "verdict": unified.final_verdict,
+                "risk_level": unified.risk_level,
+                "summary": unified.summary,
+                "reasoning": unified.reasoning,
+            },
+            raw_risk_score=unified.risk_score,
+            product_name=canonical_title,
+            marketplace=analysis.marketplace,
+            seller=raw_seller,
+            price=analysis.price,
+            findings_list=findings,
+        )
+
+        rec_action = (
+            unified.recommended_actions[0].action
+            if unified.recommended_actions
             else "Flag for manual review."
-            if risk.risk_level == "MEDIUM"
-            else "Approve listing."
         )
 
         return InvestigationReport(
-            summary=f"Investigation completed for {analysis.title} on {analysis.marketplace}.",
-            product=analysis.title,
+            summary=unified.summary,
+            product=unified.canonical_product_name,
             marketplace=analysis.marketplace,
-            seller=se.get("seller", {}).get("status", "Unknown"),
+            seller=raw_seller,
             price=analysis.price,
-            risk_score=risk.risk_score,
-            risk_level=risk.risk_level,
+            risk_score=unified.risk_score,
+            risk_level=unified.risk_level,
             evidence_summary=evidence.structured_evidence,
-            findings=findings,
-            recommendation=recommendation,
-            confidence=ai_result.confidence_score if ai_result else 0.85,
-            ai_summary=ai_result.summary if ai_result else "",
-            ai_reasoning=ai_result.detailed_reasoning if ai_result else "",
+            findings=unified.evidence_findings,
+            recommendation=rec_action,
+            confidence=unified.confidence,
+            ai_summary=unified.summary,
+            ai_reasoning=unified.reasoning,
             investigation_timestamp=datetime.now(timezone.utc).isoformat(),
             recommended_products=recommended_products or [],
         )

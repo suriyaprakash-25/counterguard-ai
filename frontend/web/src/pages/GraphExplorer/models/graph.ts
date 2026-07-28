@@ -17,6 +17,7 @@ export interface GraphEdge {
 export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  layout?: { name: string; [key: string]: any };
 }
 
 export interface GraphStatistics {

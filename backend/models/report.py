@@ -43,6 +43,7 @@ class ReportModel(Base):
     ai_summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
     ai_reasoning: Mapped[str] = mapped_column(Text, nullable=False, default="")
     investigation_timestamp: Mapped[str] = mapped_column(String, nullable=False)
+    recommended_products: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
 
     investigation: Mapped["InvestigationModel"] = relationship(
         "InvestigationModel", back_populates="report"
@@ -59,6 +60,15 @@ class ReportModel(Base):
         Deserialize JSON findings back into a Python list of strings.
         """
         return json.loads(self.findings)
+
+    def get_recommended_products_list(self) -> List[Dict[str, Any]]:
+        """
+        Deserialize JSON recommended products back into a Python list of dictionaries.
+        """
+        try:
+            return json.loads(self.recommended_products) if self.recommended_products else []
+        except Exception:
+            return []
 
     def to_pydantic(self) -> InvestigationReport:
         """
@@ -79,6 +89,7 @@ class ReportModel(Base):
             ai_summary=self.ai_summary,
             ai_reasoning=self.ai_reasoning,
             investigation_timestamp=self.investigation_timestamp,
+            recommended_products=self.get_recommended_products_list(),
         )
 
     @classmethod
@@ -107,6 +118,7 @@ class ReportModel(Base):
             "ai_summary": report_schema.ai_summary,
             "ai_reasoning": report_schema.ai_reasoning,
             "investigation_timestamp": report_schema.investigation_timestamp,
+            "recommended_products": json.dumps(report_schema.recommended_products),
         }
         if id is not None:
             kwargs["id"] = id

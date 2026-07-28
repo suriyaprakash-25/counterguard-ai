@@ -1,15 +1,17 @@
 import { apiClient, endpoints } from '../shared/api';
 import type { InvestigationSummary, InvestigationWorkspaceDetails, TimelineEvent } from '../types/investigations';
+import { InvestigationsMapper } from './investigations.mapper';
 
 export const InvestigationRepository = {
   async getInvestigations(page: number, filters: any): Promise<any> {
     const { data } = await apiClient.get(endpoints.investigations.list, { params: { page, ...filters } });
-    return data.data;
+    const items = data.data.items || data.data || [];
+    return items.map((item: any) => InvestigationsMapper.toSummary(item));
   },
 
   async getInvestigation(id: string): Promise<InvestigationWorkspaceDetails> {
     const { data } = await apiClient.get(endpoints.investigations.details(id));
-    return data.data;
+    return InvestigationsMapper.toWorkspaceDetails(data.data);
   },
 
   async getTimeline(id: string): Promise<TimelineEvent[]> {

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -41,3 +41,4 @@ class InvestigationReport(BaseModel):
     ai_summary: str = Field(default="")
     ai_reasoning: str = Field(default="")
     investigation_timestamp: str
+    recommended_products: List[Dict[str, Any]] = Field(default_factory=list)

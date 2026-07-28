@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routes import investigation, investigations
+from backend.api.routes import auth, investigation, investigations, dashboard, alerts, analytics, intelligence, graph, settings, providers
 from backend.dependencies import neo4j_client
 
 # Configure logging
@@ -40,7 +40,10 @@ app = FastAPI(
 )
 
 # CORS Middleware
-origins = os.getenv("CORS_ORIGINS", "http://localhost:8501").split(",")
+origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://localhost:3000,http://localhost:80,http://localhost,http://localhost:8080"
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,13 +64,17 @@ async def log_requests(request, call_next):
 
 
 api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(auth.router, tags=["Auth"])
+api_router.include_router(dashboard.router, tags=["Dashboard"])
+api_router.include_router(alerts.router, tags=["Alerts"])
+api_router.include_router(analytics.router, tags=["Analytics"])
+api_router.include_router(intelligence.router, tags=["Intelligence"])
+api_router.include_router(graph.router, tags=["Graph"])
+api_router.include_router(settings.router, tags=["Settings"])
 api_router.include_router(investigation.router, tags=["Investigation"])
 api_router.include_router(investigations.router, tags=["Investigation History"])
+api_router.include_router(providers.router, tags=["Providers"])
 app.include_router(api_router)
-
-# Versioned router prefix (placeholder for future routes)
-# api_router = APIRouter(prefix="/api/v1")
-# app.include_router(api_router)
 
 
 @app.get("/health", tags=["System"])

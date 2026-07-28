@@ -50,6 +50,11 @@ Thumbs.db
 
 # Virtual Environment
 .venv/
+backend/venv/
+venv/
 
 # Databases & Data
 data/
+*.db
+*.sqlite
+*.sqlite3

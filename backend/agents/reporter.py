@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional
 
 from backend.schemas.investigation import (
     AnalyzerResult,
@@ -15,7 +16,8 @@ class ReportGenerator:
         analysis: AnalyzerResult,
         evidence: EvidenceResult,
         risk: RiskAssessment,
-        ai_result: AIInvestigationResult = None,
+        ai_result: Optional[AIInvestigationResult] = None,
+        recommended_products: Optional[List[Dict[str, Any]]] = None,
     ) -> InvestigationReport:
         """
         Synthesizes the findings into a final human-readable report.
@@ -69,4 +71,5 @@ class ReportGenerator:
             ai_summary=ai_result.summary if ai_result else "",
             ai_reasoning=ai_result.detailed_reasoning if ai_result else "",
             investigation_timestamp=datetime.now(timezone.utc).isoformat(),
+            recommended_products=recommended_products or [],
         )

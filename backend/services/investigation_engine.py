@@ -1,7 +1,7 @@
 import time
 
 from backend.exceptions import InvestigationExecutionError
-from backend.logging import get_logger
+from backend.log_config import get_logger
 from backend.orchestrator.graph import get_compiled_graph
 from backend.services.investigation_factory import InvestigationFactory
 from backend.state import InvestigationState

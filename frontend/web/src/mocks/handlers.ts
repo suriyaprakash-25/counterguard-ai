@@ -7,7 +7,7 @@ import { MOCK_ANALYTICS_DTO } from '../pages/Analytics/services/analytics.mock';
 import { MOCK_GRAPH_DTO, MOCK_GRAPH_STATS_DTO } from '../pages/GraphExplorer/services/graph.mock';
 import { MOCK_SUMMARY_DTO } from '../pages/Intelligence/services/intelligence.mock';
 import { MOCK_SETTINGS_DTO } from '../pages/Settings/services/settings.mock';
-import { MOCK_INVESTIGATIONS, MOCK_WORKSPACE_DETAILS, MOCK_TIMELINE } from '../services/investigations.mock';
+import { MOCK_INVESTIGATIONS, MOCK_WORKSPACE_DETAILS } from '../services/investigations.mock';
 
 const buildUrl = (path: string) => `*${path}`;
 
@@ -86,68 +86,40 @@ export const handlers = [
     return HttpResponse.json({ data: MOCK_USER });
   }),
 
-  // Dashboard
-  http.get(buildUrl(endpoints.dashboard.metrics), () => HttpResponse.json({ data: { activeInvestigations: 142, activeAlerts: 23, highRiskSellers: 89, fraudRingsDetected: 12, investigationTrend: 12.5, alertTrend: -5.2, sellerTrend: 8.4, ringTrend: 2.1 } })),
-  http.get(buildUrl(endpoints.dashboard.marketplaceMetrics), () => HttpResponse.json({ data: MOCK_MARKETPLACE_METRICS })),
-  http.get(buildUrl(endpoints.dashboard.riskTrend), () => HttpResponse.json({ data: MOCK_RISK_TREND })),
-  http.get(buildUrl(endpoints.dashboard.systemHealth), () => HttpResponse.json({ data: MOCK_SYSTEM_HEALTH })),
-  http.get(buildUrl(endpoints.dashboard.fraudNodePreview), () => HttpResponse.json({ data: MOCK_FRAUD_NODE_PREVIEW })),
+  // Dashboard (Mocks removed - now hitting real backend)
+  // http.get(buildUrl(endpoints.dashboard.metrics), ...),
+  // http.get(buildUrl(endpoints.dashboard.marketplaceMetrics), ...),
+  // http.get(buildUrl(endpoints.dashboard.riskTrend), ...),
+  // http.get(buildUrl(endpoints.dashboard.systemHealth), ...),
+  // http.get(buildUrl(endpoints.dashboard.fraudNodePreview), ...),
 
   // Investigations
-  http.get(buildUrl(endpoints.investigations.list), () => HttpResponse.json({ data: MOCK_INVESTIGATIONS })),
-  http.post(buildUrl(endpoints.investigations.create), () => HttpResponse.json({ data: { id: 'INV-9006' } })),
-  http.get(buildUrl(endpoints.investigations.details(':id')), () => HttpResponse.json({ data: MOCK_WORKSPACE_DETAILS })),
-  http.delete(buildUrl(endpoints.investigations.delete(':id')), () => HttpResponse.json({ data: { success: true } })),
-  http.post(buildUrl(endpoints.investigations.cancel(':id')), () => HttpResponse.json({ data: { success: true } })),
-  http.post(buildUrl(endpoints.investigations.retry(':id')), () => HttpResponse.json({ data: { success: true } })),
-  http.get(buildUrl(endpoints.investigations.timeline(':id')), () => HttpResponse.json({ data: MOCK_TIMELINE })),
-  http.get(buildUrl(endpoints.investigations.graph(':id')), () => HttpResponse.json({ data: MOCK_GRAPH_DTO })),
-  http.get(buildUrl(endpoints.investigations.reasoning(':id')), () => HttpResponse.json({
-    data: {
-      reasoning: MOCK_WORKSPACE_DETAILS.explainability.reasoning,
-      supportingEvidenceIds: MOCK_WORKSPACE_DETAILS.explainability.supportingEvidenceIds,
-      recommendations: MOCK_WORKSPACE_DETAILS.recommendations
-    }
-  })),
-  http.get(buildUrl(endpoints.investigations.report(':id')), () => HttpResponse.json({
-    data: {
-      executiveSummary: "Mock Report Executive Summary",
-      riskAssessment: "High Risk",
-      evidence: MOCK_WORKSPACE_DETAILS.evidence,
-      recommendations: MOCK_WORKSPACE_DETAILS.recommendations,
-      confidence: 94
-    }
-  })),
-  http.get(buildUrl('/api/v1/investigations/:id/stream'), () => {
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'StatusUpdated', timestamp: new Date().toISOString(), investigationId: 'INV-9001', payload: { status: 'running' } })}\n\n`));
-        setTimeout(() => {
-          controller.close();
-        }, 1000);
-      }
-    });
-    return new HttpResponse(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-      },
-    });
-  }),
+  // http.get(buildUrl(endpoints.investigations.list), ...),
+  // http.post(buildUrl(endpoints.investigations.create), ...),
+  // http.get(buildUrl(endpoints.investigations.details(':id')), ...),
+  // http.delete(buildUrl(endpoints.investigations.delete(':id')), ...),
+  // http.post(buildUrl(endpoints.investigations.cancel(':id')), ...),
+  // http.post(buildUrl(endpoints.investigations.retry(':id')), ...),
+  // http.get(buildUrl(endpoints.investigations.timeline(':id')), ...),
+  // http.get(buildUrl(endpoints.investigations.graph(':id')), ...),
+  // http.get(buildUrl(endpoints.investigations.reasoning(':id')), ...),
+  // http.get(buildUrl(endpoints.investigations.report(':id')), ...),
+  // http.get(buildUrl('/api/v1/investigations/:id/stream'), ...),
 
   // Alerts
-  http.get(buildUrl(endpoints.alerts.list), () => HttpResponse.json({ data: MOCK_ALERTS_DTO })),
-  http.get(buildUrl(endpoints.alerts.details(':id')), () => HttpResponse.json({ data: MOCK_ALERTS_DTO[0] })),
+  // http.get(buildUrl(endpoints.alerts.list), ...),
+  // http.get(buildUrl(endpoints.alerts.details(':id')), ...),
 
   // Analytics
-  http.get(buildUrl(endpoints.analytics.dashboard), () => HttpResponse.json({ data: MOCK_ANALYTICS_DTO })),
+  // http.get(buildUrl(endpoints.analytics.dashboard), ...),
 
   // Settings
-  http.get(buildUrl(endpoints.settings.config), () => HttpResponse.json({ data: MOCK_SETTINGS_DTO })),
+  // http.get(buildUrl(endpoints.settings.config), ...),
 
   // Graph
-  http.get(buildUrl(endpoints.graph.data), () => HttpResponse.json({ data: MOCK_GRAPH_DTO })),
-  http.get(buildUrl(endpoints.graph.stats), () => HttpResponse.json({ data: MOCK_GRAPH_STATS_DTO })),
+  // http.get(buildUrl(endpoints.graph.data), ...),
+  // http.get(buildUrl(endpoints.graph.stats), ...),
 
   // Intelligence
-  http.get(buildUrl(endpoints.intelligence.globalSummary), () => HttpResponse.json({ data: MOCK_SUMMARY_DTO })),
+  // http.get(buildUrl(endpoints.intelligence.globalSummary), ...),
 ];

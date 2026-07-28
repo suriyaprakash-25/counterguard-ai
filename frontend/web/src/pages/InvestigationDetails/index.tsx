@@ -1,78 +1,76 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useInvestigation } from "../../hooks/useInvestigations";
-import { useRealtime } from "../../shared/realtime";
-import { useRealtimeSync } from "../../hooks/useRealtimeSync";
-import { Button } from "../../components/common/Button";
-import { Badge } from "../../components/common/Badge";
-import { LoadingSkeleton } from "../../components/common/LoadingSkeleton";
-import { ErrorState } from "../../components/common/ErrorState";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { useInvestigationDetails } from "../../hooks/useInvestigations";
 import {
   SummaryCard,
+  VerifiedRecommendationsSection,
+  ProductComparisonMatrix,
   Timeline,
   EvidenceSection,
   GraphIntelligencePreview,
   MemoryContextCard,
   ConsensusCard,
   ExplainabilityAndRecs,
-  AgentActivityTable
+  AgentActivityTable,
+  ProviderHealthWidget
 } from "../../components/investigations/WorkspaceComponents";
+import { Button } from "../../components/common/Button";
+import { Badge } from "../../components/common/Badge";
+import { ArrowLeft, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
 
-export default function InvestigationDetails() {
+export function InvestigationDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // 1. Initialize Realtime Stream
-  const { isConnected } = useRealtime(id || '');
-
-  // 2. Synchronize Stream to TanStack Query Cache
-  useRealtimeSync(id || '');
-
-  // 3. Fetch Investigation Data (Polling disabled if streaming is connected)
-  const { data, isLoading, isError, refetch } = useInvestigation(id || '', isConnected);
+  const { data, isLoading, isError, error, refetch } = useInvestigationDetails(id || "");
 
   if (isLoading) {
     return (
-      <div className="space-y-6 pb-12">
-        <LoadingSkeleton className="h-24 w-full" />
-        <LoadingSkeleton className="h-64 w-full" />
-        <div className="grid grid-cols-2 gap-6">
-          <LoadingSkeleton className="h-96 w-full" />
-          <LoadingSkeleton className="h-96 w-full" />
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="text-sm font-medium text-muted">Retrieving Cyber-Intelligence Report...</p>
       </div>
     );
   }
 
   if (isError || !data) {
-    return <ErrorState message="Failed to load investigation workspace" onRetry={() => refetch()} />;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center">
+        <AlertCircle className="h-12 w-12 text-danger" />
+        <h2 className="text-xl font-bold text-slate-900">Failed to Load Investigation Report</h2>
+        <p className="text-sm text-muted max-w-md">
+          {error?.message || "Investigation details could not be retrieved from the server."}
+        </p>
+        <div className="flex gap-3 pt-2">
+          <Button variant="outline" onClick={() => navigate("/investigations")}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Workspace
+          </Button>
+          <Button onClick={() => refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Retry
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8 pb-12">
-      {/* SECTION 1: Header */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-border pb-6">
-        <div>
-          <button
-            onClick={() => navigate("/investigations")}
-            className="flex items-center text-sm font-medium text-muted hover:text-slate-900 transition-colors mb-4"
-          >
-            <ArrowLeft className="mr-1 h-4 w-4" /> Back to Investigations
-          </button>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold text-slate-900">{data.id}</h1>
-            <Badge variant={data.status === 'completed' ? 'success' : 'warning'} className="uppercase">
-              {data.status.replace("_", " ")}
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-5">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/investigations")}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              {data.name}
+            </h1>
+            <Badge variant="outline" className="font-mono text-xs">
+              ID: {data.id.substring(0, 8)}...
             </Badge>
           </div>
-          <h2 className="text-xl text-slate-700 font-medium">{data.name}</h2>
-
-          <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted pl-11">
             <div className="flex items-center gap-1">
               <span className="font-semibold text-slate-900">Marketplace:</span> {data.marketplace}
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="font-semibold text-slate-900">Type:</span> {data.investigationType}
             </div>
             <div className="flex items-center gap-1">
               <span className="font-semibold text-slate-900">Priority:</span>
@@ -86,18 +84,39 @@ export default function InvestigationDetails() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">Export Report</Button>
-          <Button>
+          <Button variant="outline" onClick={() => window.print()}>Export Report</Button>
+          <Button onClick={() => window.open(data.listing_url || "#", "_blank")}>
             View Listing <ExternalLink className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </div>
 
       <div className="grid gap-8">
+        {/* SECTION 1: Provider Health SLA Dashboard */}
+        <section>
+          <ProviderHealthWidget />
+        </section>
+
         {/* SECTION 2: Summary */}
         <section>
           <SummaryCard data={data} />
         </section>
+
+        {/* SECTION 2.1: Verified Purchase Recommendations & Price Intelligence */}
+        <section>
+          <VerifiedRecommendationsSection
+            products={data.recommendedProducts}
+            priceIntel={data.priceIntelligence}
+            summary={data.recommendationSummary}
+          />
+        </section>
+
+        {/* SECTION 2.2: Product Comparison Matrix */}
+        {data.productComparison && (
+          <section>
+            <ProductComparisonMatrix comparison={data.productComparison} />
+          </section>
+        )}
 
         {/* SECTION 3 & 4: Timeline and Evidence */}
         <section className="grid gap-8 lg:grid-cols-3">
@@ -125,7 +144,7 @@ export default function InvestigationDetails() {
           <ExplainabilityAndRecs id={data.id} fallbackData={data} />
         </section>
 
-        {/* SECTION 10: Agent Activity */}
+        {/* SECTION 10: Agent Activity Log */}
         <section>
           <AgentActivityTable activities={data.agentActivity} />
         </section>
@@ -133,3 +152,5 @@ export default function InvestigationDetails() {
     </div>
   );
 }
+
+export default InvestigationDetailsPage;

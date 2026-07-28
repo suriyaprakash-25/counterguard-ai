@@ -1,6 +1,6 @@
 from backend.agents.base import BaseAgent
 from backend.agents.registry import AgentRegistry
-from backend.logging import get_logger
+from backend.log_config import get_logger
 from backend.state import InvestigationState
 from backend.utils.timeline import log_event
 

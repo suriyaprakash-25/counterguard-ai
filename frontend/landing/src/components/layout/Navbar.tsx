@@ -33,9 +33,9 @@ export function Navbar() {
           <a href="https://github.com/counterguard-ai" target="_blank" rel="noreferrer" className="hidden lg:block text-sm font-medium text-slate-300 hover:text-white transition-colors">
             GitHub
           </a>
-          <button className="bg-white text-slate-950 px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-slate-200 transition-colors">
+          <a href="http://localhost:5173/login" className="bg-white text-slate-950 px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-slate-200 transition-colors">
             Get Started
-          </button>
+          </a>
         </div>
       </div>
     </nav>

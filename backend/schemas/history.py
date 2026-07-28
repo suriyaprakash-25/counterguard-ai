@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -70,7 +70,7 @@ class EvidenceItemSchema(BaseModel):
 
 class InvestigationDetailResponse(BaseModel):
     """
-    Detailed investigation response including full assessment report and evidence timeline.
+    Detailed investigation response including full assessment report, evidence timeline, and enriched intelligence fields.
     """
 
     id: str
@@ -81,6 +81,16 @@ class InvestigationDetailResponse(BaseModel):
     updated_at: str
     report: Optional[InvestigationReport] = None
     evidence_timeline: List[EvidenceItemSchema] = Field(default_factory=list)
+
+    # Enriched Cyber Intelligence Dashboard fields
+    evidence: Optional[List[Dict[str, Any]]] = None
+    consensus: Optional[Dict[str, Any]] = None
+    memory_context: Optional[Dict[str, Any]] = None
+    agent_activity: Optional[List[Dict[str, Any]]] = None
+    recommended_products: Optional[List[Dict[str, Any]]] = None
+    product_comparison: Optional[Dict[str, Any]] = None
+    price_intelligence: Optional[Dict[str, Any]] = None
+    recommendation_summary: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
 

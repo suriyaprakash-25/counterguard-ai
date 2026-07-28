@@ -10,6 +10,7 @@ from backend.agents.coordinator import CoordinatorAgent
 from backend.agents.planner import PlanningAgent
 from backend.agents.reporter import ReportGenerator
 from backend.agents.specialists import BrandAgent, PriceAgent, ReviewAgent, SellerAgent
+from backend.agents.trusted_product_agent import TrustedProductAgent
 from backend.dependencies import neo4j_client
 from backend.graph.extractors.entity_extractor import EntityExtractor
 from backend.graph.repositories.neo4j_repository import Neo4jGraphRepository
@@ -44,6 +45,7 @@ from backend.tools.registry import ToolRegistry
 def build_graph() -> StateGraph:  # noqa: C901
     """
     Builds and returns the LangGraph StateGraph for multi-agent collaborative investigation.
+    Now includes TrustedProductAgent for genuine product recommendation.
     """
     graph = StateGraph(InvestigationState)
 
@@ -98,6 +100,7 @@ def build_graph() -> StateGraph:  # noqa: C901
     )
     review_agent = ReviewAgent(tools=[registry.get_tool("reverse_image_search")])
     coordinator_agent = CoordinatorAgent()
+    trusted_product_agent = TrustedProductAgent()
 
     # -- GraphRAG Integration Node --
     def node_graphrag(state: InvestigationState):
@@ -191,17 +194,16 @@ def build_graph() -> StateGraph:  # noqa: C901
                 state["evidence"],
                 state["risk"],
                 state.get("coordinator_result"),
+                state.get("recommended_products"),
             )
         }
 
     # -- Parallel Routing Function --
     def route_to_specialists(state: InvestigationState) -> List[str]:
-        # Sprint 14: Use InvestigationPlan if provided
         inv_plan = state.get("investigation_plan")
         if inv_plan and inv_plan.tasks:
             selected = [task.agent_name for task in inv_plan.tasks]
         else:
-            # Fallback to legacy planner
             plan = state.get("planning_result")
             if plan and plan.selected_specialists:
                 selected = plan.selected_specialists
@@ -234,6 +236,7 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_node("review_agent", review_agent.run)
 
     graph.add_node("coordinator", coordinator_agent.run)
+    graph.add_node("trusted_product", trusted_product_agent.run)
     graph.add_node("reporter", node_report)
     graph.add_node("save_memory", node_save_memory_and_graph)
     graph.add_node("alert", node_alert)
@@ -253,7 +256,8 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_edge("brand_agent", "coordinator")
     graph.add_edge("review_agent", "coordinator")
 
-    graph.add_edge("coordinator", "reporter")
+    graph.add_edge("coordinator", "trusted_product")
+    graph.add_edge("trusted_product", "reporter")
     graph.add_edge("reporter", "save_memory")
     graph.add_edge("save_memory", "alert")
     graph.add_edge("alert", END)

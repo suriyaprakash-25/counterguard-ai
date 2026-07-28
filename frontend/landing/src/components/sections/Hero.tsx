@@ -41,12 +41,12 @@ export function Hero() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="bg-white text-slate-950 px-8 py-4 rounded-full font-semibold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2">
+            <a href="http://localhost:5173/login" className="bg-white text-slate-950 px-8 py-4 rounded-full font-semibold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2">
               Explore Platform <ArrowRight className="h-5 w-5" />
-            </button>
-            <button className="glass text-white px-8 py-4 rounded-full font-semibold hover:bg-white/10 transition-colors flex items-center justify-center">
+            </a>
+            <a href="#architecture" className="glass text-white px-8 py-4 rounded-full font-semibold hover:bg-white/10 transition-colors flex items-center justify-center">
               View Architecture
-            </button>
+            </a>
           </div>
         </motion.div>
 

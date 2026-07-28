@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "../../components/common/PageHeader";
 import { Button } from "../../components/common/Button";
 import { RefreshCw } from "lucide-react";
@@ -10,10 +11,12 @@ import { MiniGraphPreviewWidget } from "../../components/dashboard/MiniGraphPrev
 import { SystemHealthWidget } from "../../components/dashboard/SystemHealthWidget";
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
+
   const handleRefresh = () => {
-    // In a real app with TanStack Query, we might call queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-    // For now, this is a visual placeholder for the refresh action.
-    window.location.reload();
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    queryClient.invalidateQueries({ queryKey: ["investigations"] });
+    queryClient.invalidateQueries({ queryKey: ["alerts"] });
   };
 
   return (

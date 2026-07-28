@@ -1,16 +1,16 @@
 import { Card, CardHeader, CardTitle, CardContent } from "../../../components/common/Card";
 import { Badge } from "../../../components/common/Badge";
 import { LoadingSkeleton } from "../../../components/common/LoadingSkeleton";
-import { ErrorState } from "../../../components/common/ErrorState";
 import { useNodeDetails } from "../hooks/useGraph";
-import { ExternalLink, ShieldAlert, Link2, Search, Database } from "lucide-react";
+import { ExternalLink, ShieldAlert, Link2, Search, Database, AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "../../../components/common/Button";
 
 interface NodeInspectorProps {
   nodeId: string | null;
 }
 
 export function NodeInspector({ nodeId }: NodeInspectorProps) {
-  const { data: details, isLoading, isError } = useNodeDetails(nodeId);
+  const { data: details, isLoading, isError, error, refetch } = useNodeDetails(nodeId);
 
   if (!nodeId) {
     return (
@@ -37,7 +37,18 @@ export function NodeInspector({ nodeId }: NodeInspectorProps) {
   }
 
   if (isError || !details) {
-    return <ErrorState message="Failed to load node details" />;
+    return (
+      <Card className="h-full flex flex-col items-center justify-center text-center p-6 bg-red-50/40 border-red-200">
+        <AlertCircle className="h-10 w-10 text-red-500 mb-2" />
+        <h4 className="text-base font-bold text-red-900 mb-1">Failed to Load Node Details</h4>
+        <p className="text-xs text-red-700 font-mono mb-3">
+          Node ID: '{nodeId}' | Error: {error?.message || "HTTP 404 / Invalid Entity"}
+        </p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <RefreshCw className="mr-2 h-3.5 w-3.5" /> Retry Fetch
+        </Button>
+      </Card>
+    );
   }
 
   const { node } = details;

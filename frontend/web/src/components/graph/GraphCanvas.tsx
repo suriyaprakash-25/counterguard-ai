@@ -32,13 +32,12 @@ export function GraphCanvas({ data, layoutName, onNodeSelect, selectedNodeId }: 
     }))
   ];
 
-  const layout = {
+  const layout = layoutName ? {
     name: layoutName,
-    animate: true,
-    animationDuration: 500,
+    animate: false,
     fit: true,
     padding: 30
-  };
+  } : (data.layout || { name: 'cose', fit: true, padding: 30 });
 
   const stylesheet = [
     {
@@ -58,19 +57,14 @@ export function GraphCanvas({ data, layoutName, onNodeSelect, selectedNodeId }: 
         "text-valign": "bottom",
         "text-margin-y": 8,
         "font-size": "12px",
-        "font-family": "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+        "font-family": "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
         "font-weight": "600",
         "text-outline-color": "#ffffff",
         "text-outline-width": 2,
         "width": (ele: any) => ele.data("riskScore") > 90 ? 40 : 30,
         "height": (ele: any) => ele.data("riskScore") > 90 ? 40 : 30,
         "border-width": 2,
-        "border-color": "#ffffff",
-        "shadow-blur": 10,
-        "shadow-color": "#000",
-        "shadow-opacity": 0.1,
-        "shadow-offset-x": 0,
-        "shadow-offset-y": 4
+        "border-color": "#ffffff"
       }
     },
     {
@@ -131,6 +125,9 @@ export function GraphCanvas({ data, layoutName, onNodeSelect, selectedNodeId }: 
     if (!cyRef.current) return;
     const cy = cyRef.current;
 
+    cy.resize();
+    cy.fit(undefined, 30);
+
     cy.elements().removeClass("highlighted faded");
 
     if (selectedNodeId) {
@@ -142,17 +139,20 @@ export function GraphCanvas({ data, layoutName, onNodeSelect, selectedNodeId }: 
         neighbors.removeClass("faded").addClass("highlighted");
       }
     }
-  }, [selectedNodeId, data]); // Re-run if data or selectedNodeId changes
+  }, [selectedNodeId, data, layoutName]);
 
   return (
-    <div className="w-full h-full bg-slate-50 relative rounded-xl border border-border overflow-hidden shadow-inner">
+    <div className="w-full h-full min-h-[350px] bg-slate-50 relative rounded-xl border border-border overflow-hidden shadow-inner">
       <CytoscapeComponent
         elements={elements}
         style={{ width: "100%", height: "100%" }}
         stylesheet={stylesheet as any}
         layout={layout}
-        cy={(cy) => { cyRef.current = cy; }}
-        wheelSensitivity={0.2}
+        cy={(cy) => {
+          cyRef.current = cy;
+          cy.resize();
+          cy.fit(undefined, 30);
+        }}
       />
     </div>
   );

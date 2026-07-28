@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # API Keys
+    GROQ_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
 
     # Infrastructure
     DATABASE_URL: Optional[str] = "sqlite:///./counterguard.db"

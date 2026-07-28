@@ -27,16 +27,15 @@ export const useInvestigation = (id: string, isStreamingConnected: boolean = fal
   });
 };
 
+// Export alias for Investigation Details page compatibility
+export const useInvestigationDetails = useInvestigation;
+
 export const useTimeline = (id: string) => {
   return useQuery({
     queryKey: ['investigations', 'timeline', id],
     queryFn: () => InvestigationRepository.getTimeline(id),
     staleTime: 1000 * 60,
     refetchInterval: (query) => {
-      // If we need to sync timeline with status, we could poll here too,
-      // but usually the main detail poll can trigger a refetch of timeline, or we just poll it here.
-      // Let's poll if the query is fresh, but we can't easily access the investigation status from here.
-      // We'll leave it as non-polling by default and let the component invalidate it.
       return false;
     }
   });

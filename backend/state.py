@@ -1,4 +1,4 @@
-from typing import Annotated, Dict, TypedDict
+from typing import Annotated, Dict, TypedDict, List, Any
 
 from backend.collaboration.models.context import AgentWorkspace, InvestigationContext
 from backend.schemas.investigation import (
@@ -9,6 +9,7 @@ from backend.schemas.investigation import (
     RiskAssessment,
 )
 from backend.schemas.llm_models import AIInvestigationResult, PlanningResult
+from backend.schemas.recommendation import TrustedProductResult
 from backend.schemas.scraping import ScrapingResult
 
 
@@ -68,6 +69,10 @@ class InvestigationState(TypedDict, total=False):
 
     # Explanations
     explanation: str
+
+    # Trusted Product Recommendation Agent
+    trusted_product_result: TrustedProductResult
+    recommended_products: List[Dict[str, Any]]
 
     # Legacy Outputs
     coordinator_result: AIInvestigationResult

@@ -1,6 +1,6 @@
 import logging
 
-from backend.schemas.scraping import ScrapingResult
+from backend.schemas.scraping import ScrapingResult, ParsedListing
 from backend.scrapers.page_fetcher import PageFetcher
 from backend.scrapers.parser_factory import ParserFactory
 
@@ -18,6 +18,23 @@ class ScrapingService:
         """
         logger.info(f"Starting scraping process for: {url}")
         try:
+            if url.startswith("search://"):
+                # Mock a scraping result for search queries
+                parts = url.replace("search://", "").split("/")
+                brand = parts[0] if len(parts) > 0 else "Unknown Brand"
+                product = parts[1] if len(parts) > 1 else "Unknown Product"
+
+                parsed_listing = ParsedListing(
+                    title=f"{brand} {product}",
+                    price=99.99,
+                    seller_name="Global Search",
+                    brand=brand,
+                    marketplace="Global",
+                    description=f"Search results for {product} by {brand}",
+                    images_count=1
+                )
+                return ScrapingResult(success=True, listing=parsed_listing, raw_html="<html>Mocked Search HTML</html>")
+
             html = self.fetcher.fetch(url)
 
             parser = ParserFactory.get_parser(url)

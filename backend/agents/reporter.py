@@ -37,31 +37,39 @@ class ReportGenerator:
 
         return se
 
-    def _should_skip_duplicate(self, item_lower: str, findings: List[str]) -> bool:
-        dup_rules = [
-            (item_lower == "price anomaly", "price anomaly:"),
+    def _is_contradiction(self, item_lower: str, se: Dict[str, Any]) -> bool:
+        rules = [
+            ("seller", ["seller", "trust score", "reputation"]),
+            ("price", ["price", "pricing", "retail range"]),
+            ("images", ["image", "photo", "title", "listing quality"]),
+            ("visual", ["visual"]),
+        ]
+        for key, kws in rules:
+            status = se.get(key, {}).get("status", "")
+            if status in ["Good", "Normal", "Verified"] and any(
+                kw in item_lower for kw in kws
+            ):
+                return True
+        return False
+
+    def _is_redundant(self, item_lower: str, existing_findings: List[str]) -> bool:
+        rules = [
+            (["seller", "trust score", "reputation"], "seller risk:"),
+            (["price", "pricing", "retail range"], "price anomaly:"),
+            (["image", "photo", "title", "listing quality"], "listing quality:"),
+            (["visual"], "visual mismatch:"),
+            (["warranty"], "warranty:"),
             (
-                item_lower
-                in [
-                    "seller risk",
-                    "seller verification pending",
-                    "poor seller reputation",
-                ],
-                "seller risk:",
-            ),
-            (
-                item_lower in ["warranty", "lack of warranty information"],
-                "warranty:",
-            ),
-            (
-                item_lower in ["listing quality", "limited product images"],
-                "listing quality:",
+                ["replica", "clone", "counterfeit", "fake", "99% new"],
+                "counterfeit indicator:",
             ),
         ]
-        return any(
-            cond and any(target in f.lower() for f in findings)
-            for cond, target in dup_rules
-        )
+        for kws, target in rules:
+            if any(kw in item_lower for kw in kws) and any(
+                target in f.lower() for f in existing_findings
+            ):
+                return True
+        return False
 
     def _collect_findings(
         self,
@@ -95,7 +103,9 @@ class ReportGenerator:
                 continue
             for item in lst:
                 item_lower = item.lower().strip()
-                if self._should_skip_duplicate(item_lower, findings):
+                if self._is_contradiction(item_lower, se) or self._is_redundant(
+                    item_lower, findings
+                ):
                     continue
                 if item not in findings:
                     findings.append(item)

@@ -37,6 +37,32 @@ class ReportGenerator:
 
         return se
 
+    def _should_skip_duplicate(self, item_lower: str, findings: List[str]) -> bool:
+        dup_rules = [
+            (item_lower == "price anomaly", "price anomaly:"),
+            (
+                item_lower
+                in [
+                    "seller risk",
+                    "seller verification pending",
+                    "poor seller reputation",
+                ],
+                "seller risk:",
+            ),
+            (
+                item_lower in ["warranty", "lack of warranty information"],
+                "warranty:",
+            ),
+            (
+                item_lower in ["listing quality", "limited product images"],
+                "listing quality:",
+            ),
+        ]
+        return any(
+            cond and any(target in f.lower() for f in findings)
+            for cond, target in dup_rules
+        )
+
     def _collect_findings(
         self,
         se: Dict[str, Any],
@@ -65,10 +91,14 @@ class ReportGenerator:
             getattr(ai_result, "suspicious_indicators", None),
         ]
         for lst in extra_lists:
-            if lst:
-                for item in lst:
-                    if item not in findings:
-                        findings.append(item)
+            if not lst:
+                continue
+            for item in lst:
+                item_lower = item.lower().strip()
+                if self._should_skip_duplicate(item_lower, findings):
+                    continue
+                if item not in findings:
+                    findings.append(item)
 
         if not findings:
             findings.append("No significant risk indicators found.")

@@ -1,7 +1,9 @@
+import re
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from backend.constants import Thresholds
 from backend.services.product_canonicalizer import ProductCanonicalizer
 
 
@@ -79,9 +81,6 @@ class VerdictEngine:
         "trademark unverified",
         "counterfeit",
         "ip infringement",
-        "visual mismatch",
-        "visual difference",
-        "image differs",
     ]
 
     MEDIUM_SEVERITY_KEYWORDS = [
@@ -118,29 +117,44 @@ class VerdictEngine:
     ]
 
     @classmethod
+    def _score_visual_finding(cls, finding: str) -> tuple[int, int]:
+        f_lower = finding.lower()
+        if "visual mismatch" not in f_lower and "image differs" not in f_lower:
+            return 0, 0
+        match = re.search(r"(\d+(?:\.\d+)?)%\s*similarity", f_lower)
+        if match:
+            sim_val = float(match.group(1))
+            if sim_val < Thresholds.VISUAL_SEVERITY_HIGH_MAX:
+                return 40, 0
+            elif sim_val < Thresholds.VISUAL_SIMILARITY_MIN:
+                return 0, 10
+        return 0, 10
+
+    @classmethod
     def _calculate_findings_weight(cls, findings_list: List[str]) -> tuple[int, bool]:
         """
-        Calculates risk_score by severity weighting rather than pure count:
-        - HIGH severity: explicit counterfeit/replica/IP/visual mismatch signals (+40 points each)
-        - MEDIUM severity: pricing/seller/warranty/distributor risks (+10 points each, capped at 45)
-        - LOW severity: image/shipping/listing quality (+3 points each, capped at 10)
+        Calculates risk_score by severity weighting:
+        - HIGH severity (+40): explicit counterfeit/replica/IP signals OR visual_similarity < 50.0%
+        - MEDIUM severity (+10, capped at 45): pricing/seller/warranty risks OR visual_similarity 50.0-75.0%
+        - LOW severity (+3, capped at 10): listing quality/image count
         Returns (weight, has_high_severity_findings)
         """
         findings_text = " ".join(findings_list).lower()
-        high_score = 0
+        high_score = sum(40 for kw in cls.HIGH_SEVERITY_KEYWORDS if kw in findings_text)
         medium_score = 0
         low_score = 0
 
-        for keyword in cls.HIGH_SEVERITY_KEYWORDS:
-            if keyword in findings_text:
-                high_score += 40
+        for finding in findings_list:
+            h_add, m_add = cls._score_visual_finding(finding)
+            high_score += h_add
+            medium_score += m_add
 
-        for keyword in cls.MEDIUM_SEVERITY_KEYWORDS:
-            if keyword in findings_text:
+        for kw in cls.MEDIUM_SEVERITY_KEYWORDS:
+            if kw in findings_text:
                 medium_score += 10
 
-        for keyword in cls.LOW_SEVERITY_KEYWORDS:
-            if keyword in findings_text:
+        for kw in cls.LOW_SEVERITY_KEYWORDS:
+            if kw in findings_text:
                 low_score += 3
 
         medium_score = min(45, medium_score)
@@ -216,7 +230,8 @@ class VerdictEngine:
             findings_list
         )
         risk_score = max(
-            int(raw_risk_score if has_high_severity else 0), min(100, findings_weight)
+            int(raw_risk_score if has_high_severity else 0),
+            min(100, findings_weight),
         )
 
         if not has_high_severity and risk_score > 60:

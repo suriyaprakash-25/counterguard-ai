@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useInvestigationDetails } from "../../hooks/useInvestigations";
 import {
   SummaryCard,
+  StructuredEvidenceMatrixCard,
+  DataConfidenceWarningBanner,
   VerifiedRecommendationsSection,
   ProductComparisonMatrix,
   Timeline,
@@ -62,6 +64,7 @@ export function InvestigationDetailsPage() {
 
   const isHighRisk = data.riskScore > 50;
   const titleDisplay = data.displayTitle || data.name || "Target Assessment";
+  const hasReplayData = data.agentActivity && data.agentActivity.length >= 4;
 
   return (
     <div className="space-y-8 pb-12">
@@ -73,6 +76,9 @@ export function InvestigationDetailsPage() {
         investigationName={titleDisplay}
         riskScore={data.riskScore}
       />
+
+      {/* DEDICATED DATA CONFIDENCE WARNING BANNER */}
+      <DataConfidenceWarningBanner warning={data.dataConfidenceWarning} />
 
       {/* CYBER INTELLIGENCE CASE HEADER */}
       <div className="rounded-2xl border border-border bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 text-white shadow-xl">
@@ -135,13 +141,15 @@ export function InvestigationDetailsPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
-                onClick={() => setIsReplayOpen(true)}
-              >
-                <Play className="mr-1.5 h-4 w-4 text-primary-light" /> Replay Swarm
-              </Button>
+              {hasReplayData && (
+                <Button
+                  variant="outline"
+                  className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
+                  onClick={() => setIsReplayOpen(true)}
+                >
+                  <Play className="mr-1.5 h-4 w-4 text-primary-light" /> Replay Swarm
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
@@ -149,8 +157,8 @@ export function InvestigationDetailsPage() {
               >
                 <FileText className="mr-1.5 h-4 w-4" /> Export Report
               </Button>
-              {data.listing_url && (
-                <Button className="bg-primary hover:bg-primary-dark text-white font-bold" onClick={() => window.open(data.listing_url, "_blank")}>
+              {data.originalTarget && (
+                <Button className="bg-primary hover:bg-primary-dark text-white font-bold" onClick={() => window.open(data.originalTarget, "_blank")}>
                   View Target <ExternalLink className="ml-1.5 h-4 w-4" />
                 </Button>
               )}
@@ -168,6 +176,11 @@ export function InvestigationDetailsPage() {
         {/* SECTION 2: Summary */}
         <section>
           <SummaryCard data={data} />
+        </section>
+
+        {/* SECTION 2.05: Structured Evidence Matrix with Visual Forensics */}
+        <section>
+          <StructuredEvidenceMatrixCard summary={data.evidenceSummary} />
         </section>
 
         {/* SECTION 2.1: Risk Attribution & Insights */}
@@ -193,7 +206,7 @@ export function InvestigationDetailsPage() {
 
         {/* SECTION 5: Graph Intelligence Preview */}
         <section>
-          <GraphIntelligencePreview investigationId={data.id} />
+          <GraphIntelligencePreview id={data.id} />
         </section>
 
         {/* SECTION 6: Consensus & Memory Context */}

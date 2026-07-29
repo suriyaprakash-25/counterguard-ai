@@ -197,8 +197,8 @@ export interface InvestigationWorkspaceDetails extends InvestigationSummary {
   timeline: TimelineEvent[];
   evidence: EvidenceItem[];
   graphPreview: GraphNodePreview[];
-  memoryContext: MemoryContext;
-  consensus: ConsensusDetails;
+  memoryContext: MemoryContext | null;
+  consensus: ConsensusDetails | null;
   explainability: {
     reasoning: string;
     supportingEvidenceIds: string[];
@@ -216,4 +216,6 @@ export interface InvestigationWorkspaceDetails extends InvestigationSummary {
   productComparison?: ProductComparison;
   priceIntelligence?: PriceIntelligence;
   recommendationSummary?: RecommendationSummary;
+  evidenceSummary?: any;
+  dataConfidenceWarning?: string | null;
 }

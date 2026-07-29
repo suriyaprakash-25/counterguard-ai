@@ -29,7 +29,6 @@ export const InvestigationsMapper = {
     };
   },
 
-
   toWorkspaceDetails(dto: any): InvestigationWorkspaceDetails {
     const summary = this.toSummary(dto);
     const riskScore = summary.riskScore;
@@ -89,29 +88,11 @@ export const InvestigationsMapper = {
       agent: ev.agent || ev.source || "Agent"
     }));
 
-    // 5. Consensus
-    const voteLabel = verdict.replace(/_/g, " ").toUpperCase();
-    const consensus = dto.consensus || {
-      agreementScore: verdictConfidence,
-      explanation: `Specialist agents completed multi-agent analysis and reached an agreement score of ${verdictConfidence}% for this ${voteLabel} verdict.`,
-      agentVotes: [
-        { agent: "PriceAgent", vote: voteLabel, riskScore: Math.min(100, riskScore + 5), confidence: verdictConfidence },
-        { agent: "SellerAgent", vote: voteLabel, riskScore: Math.max(0, riskScore - 10), confidence: verdictConfidence },
-        { agent: "BrandAgent", vote: voteLabel, riskScore: Math.min(100, riskScore + 2), confidence: verdictConfidence },
-        { agent: "ReviewAgent", vote: voteLabel, riskScore: Math.max(0, riskScore - 5), confidence: verdictConfidence },
-        { agent: "CoordinatorAgent", vote: voteLabel, riskScore: riskScore, confidence: verdictConfidence },
-      ]
-    };
+    // 5. Consensus (HONEST: No synthetic fabrication)
+    const consensus = dto.consensus || dto.report?.consensus || null;
 
-    // 6. Memory Context
-    const memoryContext = dto.memory_context || dto.memoryContext || {
-      previousInvestigations: 1,
-      semanticMatches: 1,
-      historicalRisk: riskScore,
-      knownPatterns: (dto.report?.findings && Array.isArray(dto.report.findings)) ? dto.report.findings.slice(0, 3) : ["Price anomaly vs MSRP baseline"],
-      knownSeller: dto.report?.seller || summary.marketplace,
-      topSimilarCase: `INV-${summary.id.substring(0, 8)}`
-    };
+    // 6. Memory Context (HONEST: No synthetic fabrication)
+    const memoryContext = dto.memory_context || dto.memoryContext || null;
 
     // 7. Recommendations
     const recommendations: any[] = [];
@@ -134,22 +115,16 @@ export const InvestigationsMapper = {
       });
     }
 
-    // 8. Agent Activity Log
-    const agentActivity = dto.agent_activity || dto.agentActivity || [
-      { id: "act-1", agent: "PlanningAgent", status: "success", runtimeMs: 140, confidence: 95, timestamp: summary.createdAt, riskScore: 0, toolsUsed: ["investigation_planner"] },
-      { id: "act-2", agent: "PriceAgent", status: "success", runtimeMs: 310, confidence: verdictConfidence, timestamp: summary.createdAt, riskScore: Math.min(100, riskScore + 5), toolsUsed: ["price_history"] },
-      { id: "act-3", agent: "SellerAgent", status: "success", runtimeMs: 270, confidence: verdictConfidence, timestamp: summary.createdAt, riskScore: Math.max(0, riskScore - 10), toolsUsed: ["whois_lookup", "seller_reputation"] },
-      { id: "act-4", agent: "BrandAgent", status: "success", runtimeMs: 405, confidence: verdictConfidence, timestamp: summary.createdAt, riskScore: Math.min(100, riskScore + 2), toolsUsed: ["trademark_lookup", "product_catalog"] },
-      { id: "act-5", agent: "ReviewAgent", status: "success", runtimeMs: 220, confidence: verdictConfidence, timestamp: summary.createdAt, riskScore: Math.max(0, riskScore - 5), toolsUsed: ["reverse_image_search"] },
-      { id: "act-6", agent: "TrustedProductAgent", status: "success", runtimeMs: 185, confidence: 98, timestamp: summary.createdAt, riskScore: 0, toolsUsed: ["recommendation_service"] },
-      { id: "act-7", agent: "CoordinatorAgent", status: "success", runtimeMs: 510, confidence: verdictConfidence, timestamp: summary.createdAt, riskScore: riskScore, toolsUsed: ["llm_service"] },
-    ];
+    // 8. Agent Activity Log (HONEST: No synthetic fabrication)
+    const agentActivity = dto.agent_activity || dto.agentActivity || [];
 
-    // 9. Recommended Products & Comparison & Intelligence
+    // 9. Recommended Products & Comparison & Intelligence & Evidence Summary
     const recommendedProducts: RecommendedProduct[] = dto.recommended_products || dto.recommendedProducts || [];
     const productComparison: ProductComparison | undefined = dto.product_comparison || dto.productComparison;
     const priceIntelligence: PriceIntelligence | undefined = dto.price_intelligence || dto.priceIntelligence;
     const recommendationSummary: RecommendationSummary | undefined = dto.recommendation_summary || dto.recommendationSummary;
+    const evidenceSummary: any = dto.report?.evidence_summary || dto.evidence_summary || null;
+    const dataConfidenceWarning: string | null = dto.report?.data_confidence_warning || dto.data_confidence_warning || null;
 
     // 10. AI Summary & Reasoning
     const aiSummary = dto.report?.ai_summary || dto.report?.summary || "Autonomous investigation synthesis in progress.";
@@ -174,7 +149,9 @@ export const InvestigationsMapper = {
       recommendedProducts,
       productComparison,
       priceIntelligence,
-      recommendationSummary
+      recommendationSummary,
+      evidenceSummary,
+      dataConfidenceWarning
     };
   }
 };

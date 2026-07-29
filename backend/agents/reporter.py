@@ -38,6 +38,14 @@ class ReportGenerator:
         return se
 
     def _is_contradiction(self, item_lower: str, se: Dict[str, Any]) -> bool:
+        # Filter out fabricated WHOIS/domain findings when live WHOIS lookup was not retrieved
+        if any(
+            kw in item_lower
+            for kw in ["private domain", "short domain age", "domain age", "whois"]
+        ):
+            if not se.get("whois_live", False):
+                return True
+
         rules = [
             ("seller", ["seller", "trust score", "reputation"]),
             ("price", ["price", "pricing", "retail range"]),
@@ -136,6 +144,9 @@ class ReportGenerator:
         )
 
         se = self._build_structured_evidence(evidence, visual_similarity)
+        if scraping_result and scraping_result.listing:
+            se["data_source"] = scraping_result.listing.data_source
+
         findings = self._collect_findings(se, visual_findings, ai_result)
 
         raw_score = risk.risk_score if risk else 50

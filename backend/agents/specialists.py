@@ -1,8 +1,12 @@
 import logging
 from typing import Any
 
-from backend.collaboration.models.context import InvestigationContext
-from backend.collaboration.models.protocol import AgentObservation
+from backend.agents.base import BaseAgent
+from backend.agents.registry import AgentRegistry
+from backend.collaboration.models.context import (
+    AgentObservation,
+    InvestigationContext,
+)
 from backend.prompts.specialist_prompts import (
     BRAND_SYSTEM_PROMPT,
     PRICE_SYSTEM_PROMPT,
@@ -19,8 +23,7 @@ from backend.schemas.llm_models import (
 from backend.services.llm_service import LLMService, LLMServiceError
 from backend.state import InvestigationState
 from backend.tools.base import BaseTool
-from backend.tools.mocks import (
-    CatalogInput,
+from backend.tools.live_tools import (
     ImageInput,
     PriceInput,
     ReputationInput,
@@ -31,29 +34,39 @@ from backend.tools.mocks import (
 logger = logging.getLogger(__name__)
 
 
-class BaseSpecialistAgent:
+class BaseSpecialistAgent(BaseAgent):
+    """
+    Base class for specialist agents that process tool outputs and write observations into the Collaborative Blackboard.
+    """
+
     def __init__(self, tools: list[BaseTool] = None):
+        super().__init__()
+        self.tools = tools or []
         self.llm_service = LLMService()
         self.system_prompt = ""
         self.response_model = None
-        self.tools = tools or []
+
+    def answer_query(self, question: str, state: InvestigationState) -> str:
+        return f"{self.__class__.__name__}: Active specialist."
 
     def run(self, state: InvestigationState) -> dict:
-        logger.info(f"Running {self.__class__.__name__}")
-
-        listing_data = (
-            state.get("scraping_result").listing.model_dump()
-            if state.get("scraping_result") and state["scraping_result"].listing
-            else {}
-        )
-        evidence_data = (
-            state.get("evidence").model_dump() if state.get("evidence") else {}
-        )
+        logger.info(f"Executing {self.__class__.__name__} specialist pipeline.")
 
         tool_data_for_prompt, state_updates = self._execute_tools(state)
 
-        context: InvestigationContext = state.get("context")
-        graphrag_markdown = context.graphrag_context if context else ""
+        listing_data = (
+            state.get("scraping_result").listing.model_dump(mode="json")
+            if state.get("scraping_result") and state["scraping_result"].listing
+            else {}
+        )
+
+        evidence_data = (
+            state.get("evidence").structured_evidence if state.get("evidence") else {}
+        )
+
+        graphrag_markdown = (
+            state.get("context").graphrag_context if state.get("context") else None
+        )
 
         user_prompt = build_specialist_user_prompt(
             listing_data=listing_data,
@@ -97,7 +110,6 @@ class BaseSpecialistAgent:
                     )
             except Exception as e:
                 logger.warning(f"Tool {tool.name} failed: {e}. Degrading gracefully.")
-                # We continue to the next tool!
 
         if not tool_outputs:
             return None, {}
@@ -117,6 +129,7 @@ class BaseSpecialistAgent:
         raise NotImplementedError
 
 
+@AgentRegistry.register("PriceAgent")
 class PriceAgent(BaseSpecialistAgent):
     def __init__(self, tools: list[BaseTool] = None):
         super().__init__(tools)
@@ -148,7 +161,9 @@ class PriceAgent(BaseSpecialistAgent):
             AgentObservation(
                 source_agent="PriceAgent",
                 content=f"Risk Score: {result.risk_score}. Reasoning: {result.reasoning}",
-                metadata={"anomaly_detected": result.anomaly_detected},
+                metadata={
+                    "anomaly_detected": getattr(result, "anomaly_detected", False)
+                },
             )
         )
         return {"price_analysis": result, "context": new_context}
@@ -159,6 +174,7 @@ class PriceAgent(BaseSpecialistAgent):
         )
 
 
+@AgentRegistry.register("SellerAgent")
 class SellerAgent(BaseSpecialistAgent):
     def __init__(self, tools: list[BaseTool] = None):
         super().__init__(tools)
@@ -176,8 +192,17 @@ class SellerAgent(BaseSpecialistAgent):
             if listing and listing.seller_name
             else "UnknownSeller.com"
         )
+        req = state.get("request")
+        req_url = req.listing_url if req and hasattr(req, "listing_url") else ""
 
         if tool_name == "whois_lookup":
+            if req_url.startswith("demo://") or (
+                listing
+                and getattr(listing, "data_source", None) == "fallback_demo_data"
+            ):
+                return None
+            if not seller or "." not in seller:
+                return None
             return WhoisInput(domain=seller)
         elif tool_name == "seller_reputation":
             return ReputationInput(seller_name=seller)
@@ -198,17 +223,20 @@ class SellerAgent(BaseSpecialistAgent):
             AgentObservation(
                 source_agent="SellerAgent",
                 content=f"Risk Score: {result.risk_score}. Reasoning: {result.reasoning}",
-                metadata={"reputation_risk": result.reputation_risk},
+                metadata={
+                    "reputation_risk": getattr(result, "reputation_risk", "Medium")
+                },
             )
         )
         return {"seller_analysis": result, "context": new_context}
 
     def _get_fallback(self) -> SellerAnalysisResult:
         return SellerAnalysisResult(
-            reputation_risk="Unknown", reasoning="Service unavailable", risk_score=50
+            reputation_risk="Medium", reasoning="Service unavailable", risk_score=50
         )
 
 
+@AgentRegistry.register("BrandAgent")
 class BrandAgent(BaseSpecialistAgent):
     def __init__(self, tools: list[BaseTool] = None):
         super().__init__(tools)
@@ -221,20 +249,15 @@ class BrandAgent(BaseSpecialistAgent):
             if state.get("scraping_result")
             else None
         )
-        brand = listing.brand if listing and listing.brand else "UnknownBrand"
-        title = listing.title if listing and listing.title else "Unknown Product"
+        brand = listing.brand if listing and listing.brand else "GenericBrand"
 
         if tool_name == "trademark_lookup":
             return TrademarkInput(brand_name=brand)
-        elif tool_name == "product_catalog":
-            return CatalogInput(brand_name=brand, product_title=title)
         return None
 
     def _map_tool_result_to_state(self, tool_name: str, result: Any) -> dict:
         if tool_name == "trademark_lookup":
             return {"trademark_data": result}
-        elif tool_name == "product_catalog":
-            return {"catalog_data": result}
         return {}
 
     def _update_state(
@@ -245,17 +268,22 @@ class BrandAgent(BaseSpecialistAgent):
             AgentObservation(
                 source_agent="BrandAgent",
                 content=f"Risk Score: {result.risk_score}. Reasoning: {result.reasoning}",
-                metadata={"authenticity_flags": result.authenticity_flags},
+                metadata={
+                    "authenticity_flags": getattr(result, "authenticity_flags", [])
+                },
             )
         )
         return {"brand_analysis": result, "context": new_context}
 
     def _get_fallback(self) -> BrandAnalysisResult:
         return BrandAnalysisResult(
-            authenticity_flags=[], reasoning="Service unavailable", risk_score=50
+            authenticity_flags=[],
+            reasoning="Service unavailable",
+            risk_score=50,
         )
 
 
+@AgentRegistry.register("ReviewAgent")
 class ReviewAgent(BaseSpecialistAgent):
     def __init__(self, tools: list[BaseTool] = None):
         super().__init__(tools)
@@ -268,15 +296,19 @@ class ReviewAgent(BaseSpecialistAgent):
             if state.get("scraping_result")
             else None
         )
-        brand = listing.brand if listing and listing.brand else "Unknown"
+        img_url = (
+            listing.image_url
+            if listing and listing.image_url
+            else "https://example.com/image.jpg"
+        )
 
         if tool_name == "reverse_image_search":
-            return ImageInput(image_url=f"http://example.com/images/{brand}.jpg")
+            return ImageInput(image_url=img_url)
         return None
 
     def _map_tool_result_to_state(self, tool_name: str, result: Any) -> dict:
         if tool_name == "reverse_image_search":
-            return {"image_data": result}
+            return {"reverse_image_data": result}
         return {}
 
     def _update_state(
@@ -287,12 +319,18 @@ class ReviewAgent(BaseSpecialistAgent):
             AgentObservation(
                 source_agent="ReviewAgent",
                 content=f"Risk Score: {result.risk_score}. Reasoning: {result.reasoning}",
-                metadata={"fake_reviews_detected": result.fake_reviews_detected},
+                metadata={
+                    "fake_reviews_detected": getattr(
+                        result, "fake_reviews_detected", False
+                    )
+                },
             )
         )
         return {"review_analysis": result, "context": new_context}
 
     def _get_fallback(self) -> ReviewAnalysisResult:
         return ReviewAnalysisResult(
-            fake_reviews_detected=False, reasoning="Service unavailable", risk_score=50
+            fake_reviews_detected=False,
+            reasoning="Service unavailable",
+            risk_score=50,
         )

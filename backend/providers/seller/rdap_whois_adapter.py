@@ -142,15 +142,16 @@ class RDAPWhoisAdapter(BaseProviderAdapter):
             except Exception as e:
                 logger.warning(f"RDAP Server {server} query notice for {domain}: {e}")
 
+        # When live lookup fails or non-live data, do NOT fabricate private domain or short age
         return {
             "domain": domain,
-            "domain_age_days": 180,
-            "registrar": "NameCheap / Cloudflare Registrar",
-            "is_private": True,
+            "domain_age_days": 0,
+            "registrar": "Unknown Registrar",
+            "is_private": False,
             "live_retrieval": False,
             "provider": self.name,
             "latency_ms": round((time.time() - start_t) * 1000, 1),
-            "http_status": 200,
+            "http_status": 404,
         }
 
     def search(self, query: str) -> Dict[str, Any]:

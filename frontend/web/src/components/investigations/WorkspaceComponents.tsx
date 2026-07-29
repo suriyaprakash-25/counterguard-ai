@@ -17,7 +17,11 @@ import { GraphMapper } from "../../pages/GraphExplorer/services/graph.mapper";
 // --- Helper Functions for Verdict & Severity Colors ---
 function getVerdictConfig(verdict: string, riskScore: number) {
   const v = (verdict || "").toLowerCase();
-  if (v === "authentic" || riskScore <= 20) {
+  if (v === "pending" || v === "in_progress" || v === "running" || v === "planning") {
+    return { label: "ANALYSIS IN PROGRESS", color: "text-amber-700 bg-amber-50 border-amber-300 animate-pulse", badgeVar: "warning" as const };
+  } else if (v === "insufficient_data") {
+    return { label: "INSUFFICIENT DATA", color: "text-slate-700 bg-slate-100 border-slate-300", badgeVar: "secondary" as const };
+  } else if (v === "authentic" || (riskScore <= 20 && v !== "pending")) {
     return { label: "AUTHENTIC", color: "text-emerald-700 bg-emerald-50 border-emerald-300", badgeVar: "success" as const };
   } else if (v === "low_risk" || (riskScore > 20 && riskScore <= 40)) {
     return { label: "LOW RISK", color: "text-amber-700 bg-amber-50 border-amber-300", badgeVar: "warning" as const };

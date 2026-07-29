@@ -248,6 +248,34 @@ class TargetNormalizationService:
                     "original_target": raw_target,
                 }
 
+            # ── 2f. Generic product URL path slug extraction ─────────────────
+            # E.g. /products/cmf-nothing-buds-c10776306.html, /product/slug, /item/slug
+            slug_match = re.search(
+                r"/(?:products?|items?|goods|p|pd|detail|listing|buy)/([^/?#]+)",
+                raw_target,
+                re.IGNORECASE,
+            )
+            if not slug_match and parsed.path:
+                slug_match = re.search(
+                    r"/([^/]+-[^/]+(?:\.html?|\.aspx?)?)$", parsed.path, re.IGNORECASE
+                )
+
+            if slug_match:
+                slug_raw = slug_match.group(1)
+                slug = re.sub(
+                    r"\.(?:html?|aspx?|php)$", "", slug_raw, flags=re.IGNORECASE
+                )
+                slug = re.sub(r"-[a-z]?\d{5,}$", "", slug, flags=re.IGNORECASE)
+                slug_clean = (
+                    cls._decode(slug).replace("-", " ").replace("_", " ").strip()
+                )
+                if len(slug_clean) > 3 and not slug_clean.isdigit():
+                    return {
+                        "display_title": slug_clean.title(),
+                        "clean_url": clean_url,
+                        "original_target": raw_target,
+                    }
+
             # ── 2f. Brand/product hints available ────────────────────────────
             if brand_hint and product_hint:
                 return {

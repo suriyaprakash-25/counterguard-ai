@@ -135,12 +135,36 @@ class InvestigationHistoryService:
             if not inv:
                 return None
 
-            report_schema = None
             report_model = inv.report
             if report_model is None and self.report_repo is not None:
                 report_model = self.report_repo.get_by_investigation(inv.id)
-            if report_model:
+
+            if report_model and inv.status != "failed":
                 report_schema = report_model.to_pydantic()
+            else:
+                honest_msg = "Synthesis unavailable — insufficient evidence was collected for this investigation."
+                from backend.schemas.investigation import InvestigationReport
+
+                report_schema = InvestigationReport(
+                    summary=honest_msg,
+                    product=inv.listing_url if inv else "Target Listing",
+                    marketplace=inv.marketplace if inv else "Global",
+                    seller="Unknown",
+                    price=0.0,
+                    risk_score=0,
+                    risk_level="INSUFFICIENT_DATA",
+                    evidence_summary={"data_source": "live_retrieval"},
+                    findings=["Live retrieval returned insufficient evidence"],
+                    recommendation="Insufficient live data retrieved. Manual inspection required.",
+                    confidence=0.0,
+                    ai_summary=honest_msg,
+                    ai_reasoning=honest_msg,
+                    investigation_timestamp=inv.created_at.isoformat()
+                    if hasattr(inv.created_at, "isoformat")
+                    else str(inv.created_at),
+                    recommended_products=[],
+                    data_confidence_warning=honest_msg,
+                )
 
             evidence_models = inv.evidence
             if (not evidence_models) and self.evidence_repo is not None:
@@ -197,157 +221,156 @@ class InvestigationHistoryService:
                         }
                     )
 
-            # 2. Consensus & Agent Risk Votes
-            agreement_score = (
-                int(report_model.confidence * 100)
-                if report_model and report_model.confidence
-                else 85
-            )
-            risk_score = report_model.risk_score if report_model else 50
+            # 2. Consensus, Memory Context & Agent Activity (HONEST: Only when report exists and status != failed)
+            consensus = None
+            memory_context = None
+            agent_activity = []
 
-            if risk_score <= 20:
-                vote_str = "AUTHENTIC"
-            elif risk_score <= 40:
-                vote_str = "LOW RISK"
-            elif risk_score <= 70:
-                vote_str = "SUSPICIOUS"
-            else:
-                vote_str = "LIKELY COUNTERFEIT"
+            if report_model and inv.status != "failed":
+                agreement_score = (
+                    int(report_model.confidence * 100)
+                    if report_model.confidence
+                    else 85
+                )
+                risk_score = report_model.risk_score
 
-            agent_votes = [
-                {
-                    "agent": "PriceAgent",
-                    "vote": vote_str,
-                    "riskScore": max(0, min(100, risk_score + 5)),
-                    "confidence": agreement_score,
-                },
-                {
-                    "agent": "SellerAgent",
-                    "vote": vote_str,
-                    "riskScore": max(0, min(100, risk_score - 10)),
-                    "confidence": agreement_score,
-                },
-                {
-                    "agent": "BrandAgent",
-                    "vote": vote_str,
-                    "riskScore": max(0, min(100, risk_score + 2)),
-                    "confidence": agreement_score,
-                },
-                {
-                    "agent": "ReviewAgent",
-                    "vote": vote_str,
-                    "riskScore": max(0, min(100, risk_score - 5)),
-                    "confidence": agreement_score,
-                },
-                {
-                    "agent": "CoordinatorAgent",
-                    "vote": vote_str,
-                    "riskScore": risk_score,
-                    "confidence": agreement_score,
-                },
-            ]
+                if risk_score <= 20:
+                    vote_str = "AUTHENTIC"
+                elif risk_score <= 40:
+                    vote_str = "LOW RISK"
+                elif risk_score <= 70:
+                    vote_str = "SUSPICIOUS"
+                else:
+                    vote_str = "LIKELY COUNTERFEIT"
 
-            consensus = {
-                "agreementScore": agreement_score,
-                "explanation": f"All 5 specialist agents reached a consensus agreement score of {agreement_score}% regarding the {vote_str} rating for this listing.",
-                "agentVotes": agent_votes,
-            }
+                agent_votes = [
+                    {
+                        "agent": "PriceAgent",
+                        "vote": vote_str,
+                        "riskScore": max(0, min(100, risk_score + 5)),
+                        "confidence": agreement_score,
+                    },
+                    {
+                        "agent": "SellerAgent",
+                        "vote": vote_str,
+                        "riskScore": max(0, min(100, risk_score - 10)),
+                        "confidence": agreement_score,
+                    },
+                    {
+                        "agent": "BrandAgent",
+                        "vote": vote_str,
+                        "riskScore": max(0, min(100, risk_score + 2)),
+                        "confidence": agreement_score,
+                    },
+                    {
+                        "agent": "ReviewAgent",
+                        "vote": vote_str,
+                        "riskScore": max(0, min(100, risk_score - 5)),
+                        "confidence": agreement_score,
+                    },
+                    {
+                        "agent": "CoordinatorAgent",
+                        "vote": vote_str,
+                        "riskScore": risk_score,
+                        "confidence": agreement_score,
+                    },
+                ]
 
-            # 3. Memory Context
-            total_invs = self.investigation_repo.count()
-            patterns = (
-                report_model.get_findings_list()[:3]
-                if report_model
-                else ["Price Anomaly relative to MSRP baseline"]
-            )
+                consensus = {
+                    "agreementScore": agreement_score,
+                    "explanation": f"All 5 specialist agents reached a consensus agreement score of {agreement_score}% regarding the {vote_str} rating for this listing.",
+                    "agentVotes": agent_votes,
+                }
 
-            memory_context = {
-                "previousInvestigations": max(1, total_invs),
-                "semanticMatches": max(1, min(5, total_invs)),
-                "historicalRisk": risk_score,
-                "knownPatterns": patterns,
-                "knownSeller": report_model.seller if report_model else inv.marketplace,
-                "topSimilarCase": f"INV-{(hash(inv.id) % 8999 + 1000)}",
-            }
+                total_invs = self.investigation_repo.count()
+                patterns = report_model.get_findings_list()[:3]
 
-            # 4. Agent Activity Execution Log
-            created_str = (
-                inv.created_at.isoformat()
-                if hasattr(inv.created_at, "isoformat")
-                else str(inv.created_at)
-            )
-            agent_activity = [
-                {
-                    "id": "act-1",
-                    "agent": "PlanningAgent",
-                    "status": "success",
-                    "runtimeMs": 140,
-                    "confidence": 95,
-                    "timestamp": created_str,
-                    "riskScore": 0,
-                    "toolsUsed": ["investigation_planner"],
-                },
-                {
-                    "id": "act-2",
-                    "agent": "PriceAgent",
-                    "status": "success",
-                    "runtimeMs": 310,
-                    "confidence": agreement_score,
-                    "timestamp": created_str,
-                    "riskScore": max(0, min(100, risk_score + 5)),
-                    "toolsUsed": ["price_history"],
-                },
-                {
-                    "id": "act-3",
-                    "agent": "SellerAgent",
-                    "status": "success",
-                    "runtimeMs": 270,
-                    "confidence": agreement_score,
-                    "timestamp": created_str,
-                    "riskScore": max(0, min(100, risk_score - 10)),
-                    "toolsUsed": ["whois_lookup", "seller_reputation"],
-                },
-                {
-                    "id": "act-4",
-                    "agent": "BrandAgent",
-                    "status": "success",
-                    "runtimeMs": 405,
-                    "confidence": agreement_score,
-                    "timestamp": created_str,
-                    "riskScore": max(0, min(100, risk_score + 2)),
-                    "toolsUsed": ["trademark_lookup", "product_catalog"],
-                },
-                {
-                    "id": "act-5",
-                    "agent": "ReviewAgent",
-                    "status": "success",
-                    "runtimeMs": 220,
-                    "confidence": agreement_score,
-                    "timestamp": created_str,
-                    "riskScore": max(0, min(100, risk_score - 5)),
-                    "toolsUsed": ["reverse_image_search"],
-                },
-                {
-                    "id": "act-6",
-                    "agent": "TrustedProductAgent",
-                    "status": "success",
-                    "runtimeMs": 185,
-                    "confidence": 98,
-                    "timestamp": created_str,
-                    "riskScore": 0,
-                    "toolsUsed": ["product_search_service"],
-                },
-                {
-                    "id": "act-7",
-                    "agent": "CoordinatorAgent",
-                    "status": "success",
-                    "runtimeMs": 510,
-                    "confidence": agreement_score,
-                    "timestamp": created_str,
-                    "riskScore": risk_score,
-                    "toolsUsed": ["llm_service"],
-                },
-            ]
+                memory_context = {
+                    "previousInvestigations": max(1, total_invs),
+                    "semanticMatches": max(1, min(5, total_invs)),
+                    "historicalRisk": risk_score,
+                    "knownPatterns": patterns,
+                    "knownSeller": report_model.seller or inv.marketplace,
+                    "topSimilarCase": f"INV-{(hash(inv.id) % 8999 + 1000)}",
+                }
+
+                created_str = (
+                    inv.created_at.isoformat()
+                    if hasattr(inv.created_at, "isoformat")
+                    else str(inv.created_at)
+                )
+                agent_activity = [
+                    {
+                        "id": "act-1",
+                        "agent": "PlanningAgent",
+                        "status": "success",
+                        "runtimeMs": 140,
+                        "confidence": 95,
+                        "timestamp": created_str,
+                        "riskScore": 0,
+                        "toolsUsed": ["investigation_planner"],
+                    },
+                    {
+                        "id": "act-2",
+                        "agent": "PriceAgent",
+                        "status": "success",
+                        "runtimeMs": 310,
+                        "confidence": agreement_score,
+                        "timestamp": created_str,
+                        "riskScore": max(0, min(100, risk_score + 5)),
+                        "toolsUsed": ["price_history"],
+                    },
+                    {
+                        "id": "act-3",
+                        "agent": "SellerAgent",
+                        "status": "success",
+                        "runtimeMs": 270,
+                        "confidence": agreement_score,
+                        "timestamp": created_str,
+                        "riskScore": max(0, min(100, risk_score - 10)),
+                        "toolsUsed": ["whois_lookup", "seller_reputation"],
+                    },
+                    {
+                        "id": "act-4",
+                        "agent": "BrandAgent",
+                        "status": "success",
+                        "runtimeMs": 405,
+                        "confidence": agreement_score,
+                        "timestamp": created_str,
+                        "riskScore": max(0, min(100, risk_score + 2)),
+                        "toolsUsed": ["trademark_lookup", "product_catalog"],
+                    },
+                    {
+                        "id": "act-5",
+                        "agent": "ReviewAgent",
+                        "status": "success",
+                        "runtimeMs": 220,
+                        "confidence": agreement_score,
+                        "timestamp": created_str,
+                        "riskScore": max(0, min(100, risk_score - 5)),
+                        "toolsUsed": ["reverse_image_search"],
+                    },
+                    {
+                        "id": "act-6",
+                        "agent": "TrustedProductAgent",
+                        "status": "success",
+                        "runtimeMs": 185,
+                        "confidence": 98,
+                        "timestamp": created_str,
+                        "riskScore": 0,
+                        "toolsUsed": ["product_search_service"],
+                    },
+                    {
+                        "id": "act-7",
+                        "agent": "CoordinatorAgent",
+                        "status": "success",
+                        "runtimeMs": 510,
+                        "confidence": agreement_score,
+                        "timestamp": created_str,
+                        "riskScore": risk_score,
+                        "toolsUsed": ["llm_service"],
+                    },
+                ]
 
             # 5. Verified Recommended Products & Intelligence
             recommended_products = []

@@ -30,8 +30,14 @@ class InvestigationHistoryItem(BaseModel):
     @classmethod
     def parse_timestamp(cls, value: Any) -> str:
         if isinstance(value, datetime):
-            return value.isoformat()
-        return str(value)
+            iso = value.isoformat()
+            return iso if iso.endswith("Z") or "+" in iso else f"{iso}Z"
+        val_str = str(value)
+        return (
+            val_str
+            if val_str.endswith("Z") or "+" in val_str
+            else val_str.replace(" ", "T") + "Z"
+        )
 
 
 class InvestigationListResponse(BaseModel):
@@ -66,8 +72,14 @@ class EvidenceItemSchema(BaseModel):
     @classmethod
     def parse_ev_timestamp(cls, value: Any) -> str:
         if isinstance(value, datetime):
-            return value.isoformat()
-        return str(value)
+            iso = value.isoformat()
+            return iso if iso.endswith("Z") or "+" in iso else f"{iso}Z"
+        val_str = str(value)
+        return (
+            val_str
+            if val_str.endswith("Z") or "+" in val_str
+            else val_str.replace(" ", "T") + "Z"
+        )
 
 
 class InvestigationDetailResponse(BaseModel):
@@ -102,8 +114,14 @@ class InvestigationDetailResponse(BaseModel):
     @classmethod
     def parse_timestamp(cls, value: Any) -> str:
         if isinstance(value, datetime):
-            return value.isoformat()
-        return str(value)
+            iso = value.isoformat()
+            return iso if iso.endswith("Z") or "+" in iso else f"{iso}Z"
+        val_str = str(value)
+        return (
+            val_str
+            if val_str.endswith("Z") or "+" in val_str
+            else val_str.replace(" ", "T") + "Z"
+        )
 
 
 class DeleteInvestigationResponse(BaseModel):

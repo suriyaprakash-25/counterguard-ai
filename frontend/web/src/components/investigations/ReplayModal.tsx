@@ -44,8 +44,6 @@ export function ReplayModal({ isOpen, onClose, agentActivity, investigationName,
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  if (!isOpen) return null;
-
   const hasSufficientData = agentActivity && agentActivity.length >= 4;
 
   const steps = hasSufficientData
@@ -80,6 +78,9 @@ export function ReplayModal({ isOpen, onClose, agentActivity, investigationName,
     setCurrentStep(0);
     setIsPlaying(false);
   };
+
+  // Early return AFTER all hooks (React Rules of Hooks: no conditional hooks)
+  if (!isOpen) return null;
 
   const currentStepData = steps[currentStep];
 

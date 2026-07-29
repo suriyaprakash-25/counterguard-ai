@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Button } from '../../components/common/Button';
 import { useCreateInvestigation } from '../../hooks/useInvestigations';
 import { useNavigate } from 'react-router-dom';
+import { normalizeTarget } from '../../services/target_normalization';
 import {
   ShieldAlert,
   Zap,
@@ -92,16 +93,16 @@ const MISSION_TYPES = [
 ];
 
 const MISSION_OBJECTIVES = [
-  { id: 'Verify Product Authenticity', label: 'Verify Product Authenticity', defaultChecked: true },
-  { id: 'Verify Seller Identity & Trust', label: 'Verify Seller Identity & Trust', defaultChecked: true },
-  { id: 'Trademark Registry Verification', label: 'Trademark Registry Verification', defaultChecked: true },
-  { id: 'Domain WHOIS & DNS Reputation', label: 'Domain WHOIS & DNS Reputation', defaultChecked: true },
-  { id: 'Cross-Provider Price Baseline Analysis', label: 'Cross-Provider Price Baseline Analysis', defaultChecked: true },
-  { id: 'Historical Pattern Matching & Fraud Memory', label: 'Historical Pattern Matching & Fraud Memory', defaultChecked: true },
-  { id: 'Recommend Genuine Verified Alternatives', label: 'Recommend Genuine Verified Alternatives', defaultChecked: true },
-  { id: 'Grey Market & Regional Variance Detection', label: 'Grey Market & Regional Mismatch', defaultChecked: false },
-  { id: 'Review Authenticity & NLP Analysis', label: 'Review NLP & Image Verification', defaultChecked: false },
-  { id: 'Graph Network Entity Resolution', label: 'Knowledge Graph Entity Resolution', defaultChecked: true }
+  { id: 'Verify Product Authenticity', label: 'Verify Product Authenticity', defaultChecked: true, comingSoon: false },
+  { id: 'Verify Seller Identity & Trust', label: 'Verify Seller Identity & Trust', defaultChecked: true, comingSoon: false },
+  { id: 'Trademark Registry Verification', label: 'Trademark Registry Verification', defaultChecked: true, comingSoon: false },
+  { id: 'Domain WHOIS & DNS Reputation', label: 'Domain WHOIS & DNS Reputation', defaultChecked: true, comingSoon: false },
+  { id: 'Cross-Provider Price Baseline Analysis', label: 'Cross-Provider Price Baseline Analysis', defaultChecked: true, comingSoon: false },
+  { id: 'Historical Pattern Matching & Fraud Memory', label: 'Historical Pattern Matching & Fraud Memory', defaultChecked: false, comingSoon: true },
+  { id: 'Recommend Genuine Verified Alternatives', label: 'Recommend Genuine Verified Alternatives', defaultChecked: true, comingSoon: false },
+  { id: 'Grey Market & Regional Variance Detection', label: 'Grey Market & Regional Mismatch', defaultChecked: false, comingSoon: false },
+  { id: 'Review Authenticity & NLP Analysis', label: 'Review NLP & Image Verification', defaultChecked: false, comingSoon: false },
+  { id: 'Graph Network Entity Resolution', label: 'Knowledge Graph Entity Resolution', defaultChecked: false, comingSoon: true }
 ];
 
 const PLANNING_STRATEGIES = [
@@ -196,32 +197,85 @@ export function CreateInvestigationDialog({ isOpen, onClose }: CreateInvestigati
   const handleTargetValueChange = (val: string) => {
     setTargetValue(val);
 
-    if (!isNameEdited) {
-      if (val.includes('amazon.')) {
-        setMarketplace('Amazon');
-      } else if (val.includes('ebay.')) {
-        setMarketplace('eBay');
-      } else if (val.includes('bestbuy.')) {
-        setMarketplace('BestBuy');
-      } else if (val.includes('walmart.')) {
-        setMarketplace('Walmart');
+    if (!val.trim()) {
+      if (!isNameEdited) setInvestigationName('');
+      return;
+    }
+
+    // Auto-detect Marketplace
+    let detectedMarketplace = marketplace;
+    if (val.includes('amazon.')) {
+      detectedMarketplace = 'Amazon';
+    } else if (val.includes('ebay.')) {
+      detectedMarketplace = 'eBay';
+    } else if (val.includes('bestbuy.')) {
+      detectedMarketplace = 'BestBuy';
+    } else if (val.includes('walmart.')) {
+      detectedMarketplace = 'Walmart';
+    } else if (val.includes('flipkart.')) {
+      detectedMarketplace = 'Flipkart';
+    } else if (val.includes('tradeindia.')) {
+      detectedMarketplace = 'TradeIndia';
+    } else if (val.includes('meesho.')) {
+      detectedMarketplace = 'Meesho';
+    } else if (val.includes('ajio.')) {
+      detectedMarketplace = 'AJIO';
+    } else if (val.includes('myntra.')) {
+      detectedMarketplace = 'Myntra';
+    } else if (val.startsWith('http://') || val.startsWith('https://')) {
+      try {
+        const u = new URL(val);
+        const host = u.hostname.replace(/^www\./, '').split('.')[0];
+        detectedMarketplace = host.charAt(0).toUpperCase() + host.slice(1);
+      } catch {
+        detectedMarketplace = 'Global';
+      }
+    }
+    setMarketplace(detectedMarketplace);
+
+    // Auto-normalize title & extract Brand / Product
+    const norm = normalizeTarget(val);
+
+    if (val.startsWith('http://') || val.startsWith('https://')) {
+      const cleanTitle = norm.displayTitle;
+      const words = cleanTitle.split(' ');
+
+      // Infer Brand and Model if not already typed
+      let inferredBrand = brand;
+      let inferredProd = product;
+
+      if (!brand) {
+        if (cleanTitle.toLowerCase().includes('nothing') || cleanTitle.toLowerCase().includes('cmf')) {
+          inferredBrand = 'Nothing';
+        } else if (cleanTitle.toLowerCase().includes('sony')) {
+          inferredBrand = 'Sony';
+        } else if (cleanTitle.toLowerCase().includes('apple') || cleanTitle.toLowerCase().includes('iphone') || cleanTitle.toLowerCase().includes('airpods')) {
+          inferredBrand = 'Apple';
+        } else {
+          inferredBrand = words[0] || 'Generic Brand';
+        }
+        setBrand(inferredBrand);
       }
 
-      if (val.startsWith('http://') || val.startsWith('https://')) {
-        const parts = val.replace(/^https?:\/\//, '').split('/');
-        const domain = parts[0] || 'Web Target';
-        const pathPart = parts.find(p => p.length > 5 && !p.includes('.')) || 'Listing';
-        setInvestigationName(`Mission: ${domain} (${pathPart.substring(0, 15)})`);
-      } else if (val.trim()) {
-        const words = val.trim().split(' ');
-        const inferredBrand = words[0] || 'Brand';
-        const inferredProd = words.slice(1).join(' ') || words[0];
-        if (!brand) setBrand(inferredBrand);
-        if (!product) setProduct(inferredProd);
-        setInvestigationName(`search://${inferredBrand}/${inferredProd}`);
-      } else {
-        setInvestigationName('');
+      if (!product) {
+        if (cleanTitle.toLowerCase().includes('cmf') && cleanTitle.toLowerCase().includes('buds')) {
+          inferredProd = 'CMF Buds';
+        } else {
+          inferredProd = words.slice(1).join(' ') || words[0] || 'Target Listing';
+        }
+        setProduct(inferredProd);
       }
+
+      if (!isNameEdited) {
+        setInvestigationName(`search://${inferredBrand || 'Brand'}/${inferredProd || cleanTitle}`);
+      }
+    } else if (val.trim() && !isNameEdited) {
+      const words = val.trim().split(' ');
+      const inferredBrand = words[0] || 'Brand';
+      const inferredProd = words.slice(1).join(' ') || words[0];
+      if (!brand) setBrand(inferredBrand);
+      if (!product) setProduct(inferredProd);
+      setInvestigationName(`search://${inferredBrand}/${inferredProd}`);
     }
   };
 
@@ -427,6 +481,10 @@ export function CreateInvestigationDialog({ isOpen, onClose }: CreateInvestigati
                       <option value="BestBuy">Best Buy Stores</option>
                       <option value="Walmart">Walmart Retail Online</option>
                       <option value="Flipkart">Flipkart Commerce</option>
+                      <option value="TradeIndia">TradeIndia B2B Commerce</option>
+                      <option value="Meesho">Meesho Social Commerce</option>
+                      <option value="AJIO">AJIO Fashion Commerce</option>
+                      <option value="Myntra">Myntra Fashion Commerce</option>
                       <option value="AliExpress">AliExpress Market</option>
                       <option value="Global">Global Multi-Platform Search</option>
                     </select>
@@ -529,23 +587,33 @@ export function CreateInvestigationDialog({ isOpen, onClose }: CreateInvestigati
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {MISSION_OBJECTIVES.map(obj => {
-                      const isChecked = selectedObjectives.includes(obj.id);
+                      const isChecked = selectedObjectives.includes(obj.id) && !obj.comingSoon;
+                      const isDisabled = obj.comingSoon;
                       return (
                         <div
                           key={obj.id}
-                          onClick={() => toggleObjective(obj.id)}
-                          className={`flex items-center gap-3 p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
-                            isChecked
-                              ? 'border-emerald-300 bg-emerald-50/50 text-slate-900 font-medium'
-                              : 'border-border bg-surface text-slate-600 hover:bg-slate-50'
+                          onClick={() => !isDisabled && toggleObjective(obj.id)}
+                          className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-all ${
+                            isDisabled
+                              ? 'border-border bg-slate-100/60 text-slate-400 cursor-not-allowed opacity-75'
+                              : isChecked
+                              ? 'border-emerald-300 bg-emerald-50/50 text-slate-900 font-medium cursor-pointer'
+                              : 'border-border bg-surface text-slate-600 hover:bg-slate-50 cursor-pointer'
                           }`}
                         >
-                          <div className={`h-4 w-4 rounded flex items-center justify-center border transition-all ${
-                            isChecked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
-                          }`}>
-                            {isChecked && <CheckCircle2 className="h-3 w-3" />}
+                          <div className="flex items-center gap-3">
+                            <div className={`h-4 w-4 rounded flex items-center justify-center border transition-all ${
+                              isChecked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
+                            }`}>
+                              {isChecked && <CheckCircle2 className="h-3 w-3" />}
+                            </div>
+                            <span>{obj.label}</span>
                           </div>
-                          <span>{obj.label}</span>
+                          {isDisabled && (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
+                              Coming Soon
+                            </span>
+                          )}
                         </div>
                       );
                     })}

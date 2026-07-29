@@ -43,8 +43,12 @@ class AnalyzerAgent:
             for w in ["refurbished", "unverified", "deals", "third party", "cheap"]
         )
 
-        if listing.price is not None and (
-            listing.price < 200.0 or is_replica or is_discount_or_refurbished
+        raw_price = listing.price
+        if raw_price is not None and getattr(listing, "currency", "USD") == "INR":
+            raw_price = raw_price / 83.0
+
+        if raw_price is not None and (
+            raw_price < 30.0 or is_replica or is_discount_or_refurbished
         ):
             risk_signals.append("very_low_price")
 

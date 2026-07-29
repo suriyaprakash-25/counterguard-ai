@@ -13,16 +13,15 @@ export const useInvestigation = (id: string, isStreamingConnected: boolean = fal
   return useQuery({
     queryKey: ['investigations', 'detail', id],
     queryFn: () => InvestigationRepository.getInvestigation(id),
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 0,
     refetchInterval: (query) => {
-      // Disable polling entirely if real-time streaming is connected
       if (isStreamingConnected) return false;
 
       const status = query.state?.data?.status;
-      if (status === 'running' || status === 'planning' || status === 'in_progress') {
-        return 5000; // Poll every 5 seconds while running
+      if (!status || status === 'running' || status === 'planning' || status === 'in_progress' || status === 'pending') {
+        return 2000;
       }
-      return false; // Stop polling
+      return false;
     }
   });
 };

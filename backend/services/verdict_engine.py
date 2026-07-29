@@ -196,9 +196,13 @@ class VerdictEngine:
         market_avg_price: float = 0.0,
         brand_name: Optional[str] = None,
         data_source: str = "live_retrieval",
+        evidence_signals_count: Optional[int] = None,
+        investigation_status: Optional[str] = None,
+        usable_specialist_count: Optional[int] = None,
     ) -> UnifiedVerdict:
         """
         Evaluate and synchronize all assessment parameters into a single UnifiedVerdict.
+        Enforces INSUFFICIENT_DATA and consensus-verdict invariants.
         """
         evidence_list = evidence_list or []
         findings_list = findings_list or []
@@ -216,7 +220,16 @@ class VerdictEngine:
             round(abs((avg_p - base_price) / avg_p) * 100) if avg_p > 0 else 20
         )
 
-        if data_source == "fallback_demo_data":
+        # 1. Extended INSUFFICIENT_DATA Guard
+        status_lower = (investigation_status or "").lower()
+        is_insufficient = (
+            data_source == "fallback_demo_data"
+            or status_lower in ("failed", "cancelled")
+            or (evidence_signals_count is not None and evidence_signals_count == 0)
+            or (usable_specialist_count is not None and usable_specialist_count < 2)
+        )
+
+        if is_insufficient:
             return cls._build_fallback_verdict(
                 canonical_product,
                 marketplace,
@@ -229,6 +242,9 @@ class VerdictEngine:
         findings_weight, has_high_severity = cls._calculate_findings_weight(
             findings_list
         )
+        if raw_risk_score >= 70:
+            has_high_severity = True
+
         risk_score = max(
             int(raw_risk_score if has_high_severity else 0),
             min(100, findings_weight),
@@ -244,6 +260,16 @@ class VerdictEngine:
             for f in findings_list
             if not ("no significant" in f.lower() or "verified" in f.lower())
         ]
+
+        # 2. Hard Invariant: Consensus vs Top-Level Verdict Alignment
+        # If negative findings exist or specialist risk is high, verdict CANNOT be AUTHENTIC.
+        if final_verdict == "AUTHENTIC" and (
+            negative_findings or raw_risk_score >= 40 or has_high_severity
+        ):
+            final_verdict = "SUSPICIOUS"
+            risk_level = "MEDIUM"
+            risk_score = max(risk_score, 45)
+
         confidence = cls._calculate_confidence(final_verdict, len(negative_findings))
         conf_pct = round(confidence * 100)
 
@@ -324,14 +350,15 @@ class VerdictEngine:
         avg_p,
         findings_list,
     ):
+        honest_msg = f"INSUFFICIENT DATA: Synthesis unavailable — insufficient evidence was collected for this investigation on {marketplace}."
         return UnifiedVerdict(
             final_verdict="INSUFFICIENT_DATA",
             risk_score=0,
             risk_level="INSUFFICIENT_DATA",
-            confidence=0.5000,
-            confidence_percentage=50,
-            summary=f"INSUFFICIENT DATA: Live retrieval failed for '{canonical_product}' on {marketplace}. System operating on demo fallback data.",
-            reasoning="Live HTTP fetch for listing URL failed or was blocked by anti-bot protections. Verdict set to INSUFFICIENT_DATA.",
+            confidence=0.0000,
+            confidence_percentage=0,
+            summary=honest_msg,
+            reasoning=honest_msg,
             canonical_product_name=canonical_product,
             marketplace=marketplace,
             seller=seller_name,
@@ -341,7 +368,7 @@ class VerdictEngine:
                     category="Manual Review",
                     priority="High",
                     action=f"Retry investigation with an accessible live product URL or provider API for {marketplace}.",
-                    reason="Automated live retrieval returned fallback data.",
+                    reason="Automated live retrieval returned insufficient evidence.",
                 )
             ],
             comparison_matrix=UnifiedComparisonMatrix(
@@ -369,8 +396,8 @@ class VerdictEngine:
                 ),
             ),
             evidence_findings=findings_list
-            or [f"Live retrieval failed for {marketplace}"],
-            data_confidence_warning="Live retrieval failed for this listing URL. System operating in demo fallback mode.",
+            or ["Live retrieval returned insufficient evidence"],
+            data_confidence_warning=honest_msg,
         )
 
     @classmethod

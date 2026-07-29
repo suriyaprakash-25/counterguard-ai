@@ -33,10 +33,11 @@ export const InvestigationsMapper = {
     const summary = this.toSummary(dto);
     const riskScore = summary.riskScore;
 
-    // 1. Determine Verdict from Risk Score Thresholds:
-    // 0-20: AUTHENTIC, 21-40: LOW RISK, 41-70: SUSPICIOUS, 71-100: LIKELY COUNTERFEIT
-    let verdict: "authentic" | "low_risk" | "suspicious" | "likely_counterfeit" | "pending" = "pending";
-    if (dto.status === 'completed' || dto.report) {
+    // 1. Determine Verdict from Risk Score Thresholds or INSUFFICIENT_DATA
+    let verdict: "authentic" | "low_risk" | "suspicious" | "likely_counterfeit" | "pending" | "insufficient_data" = "pending";
+    if (dto.status === 'failed' || dto.report?.final_verdict === 'INSUFFICIENT_DATA' || dto.report?.risk_level === 'INSUFFICIENT_DATA') {
+      verdict = "insufficient_data" as any;
+    } else if (dto.status === 'completed' || dto.report) {
       if (riskScore <= 20) {
         verdict = "authentic";
       } else if (riskScore <= 40) {
@@ -49,11 +50,14 @@ export const InvestigationsMapper = {
     }
 
     // 2. Verdict Confidence (0-100%)
-    let rawConf = dto.report?.confidence ?? 0.85;
-    if (rawConf > 0 && rawConf <= 1.0) {
-      rawConf = Math.round(rawConf * 100);
+    let verdictConfidence = 0;
+    if (verdict !== ("insufficient_data" as any)) {
+      let rawConf = dto.report?.confidence ?? 0.85;
+      if (rawConf > 0 && rawConf <= 1.0) {
+        rawConf = Math.round(rawConf * 100);
+      }
+      verdictConfidence = Math.min(100, Math.max(1, Math.round(rawConf)));
     }
-    const verdictConfidence = Math.min(100, Math.max(1, Math.round(rawConf)));
 
     // 3. Map Timeline Events
     const timeline: TimelineEvent[] = (dto.evidence_timeline || []).map((ev: any, idx: number) => {
@@ -89,10 +93,14 @@ export const InvestigationsMapper = {
     }));
 
     // 5. Consensus (HONEST: No synthetic fabrication)
-    const consensus = dto.consensus || dto.report?.consensus || null;
+    const consensus = (dto.status === 'failed' || verdict === ("insufficient_data" as any))
+      ? null
+      : (dto.consensus || dto.report?.consensus || null);
 
     // 6. Memory Context (HONEST: No synthetic fabrication)
-    const memoryContext = dto.memory_context || dto.memoryContext || null;
+    const memoryContext = (dto.status === 'failed' || verdict === ("insufficient_data" as any))
+      ? null
+      : (dto.memory_context || dto.memoryContext || null);
 
     // 7. Recommendations
     const recommendations: any[] = [];
@@ -116,7 +124,9 @@ export const InvestigationsMapper = {
     }
 
     // 8. Agent Activity Log (HONEST: No synthetic fabrication)
-    const agentActivity = dto.agent_activity || dto.agentActivity || [];
+    const agentActivity = (dto.status === 'failed' || verdict === ("insufficient_data" as any))
+      ? []
+      : (dto.agent_activity || dto.agentActivity || []);
 
     // 9. Recommended Products & Comparison & Intelligence & Evidence Summary
     const recommendedProducts: RecommendedProduct[] = dto.recommended_products || dto.recommendedProducts || [];
@@ -124,11 +134,20 @@ export const InvestigationsMapper = {
     const priceIntelligence: PriceIntelligence | undefined = dto.price_intelligence || dto.priceIntelligence;
     const recommendationSummary: RecommendationSummary | undefined = dto.recommendation_summary || dto.recommendationSummary;
     const evidenceSummary: any = dto.report?.evidence_summary || dto.evidence_summary || null;
-    const dataConfidenceWarning: string | null = dto.report?.data_confidence_warning || dto.data_confidence_warning || null;
 
-    // 10. AI Summary & Reasoning
-    const aiSummary = dto.report?.ai_summary || dto.report?.summary || "Autonomous investigation synthesis in progress.";
-    const reasoning = dto.report?.ai_reasoning || dto.report?.summary || "Multi-agent evaluation completed.";
+    const honestWarning = "Synthesis unavailable — insufficient evidence was collected for this investigation.";
+    // Only show warning when investigation actually failed — never during in_progress/pending
+    const dataConfidenceWarning: string | null = (dto.status === 'failed')
+      ? honestWarning
+      : (dto.report?.data_confidence_warning || dto.data_confidence_warning || null);
+
+    // Only show warning when investigation actually failed — never during in_progress/pending
+    const aiSummary = (dto.status === 'failed')
+      ? honestWarning
+      : (dto.report?.ai_summary || dto.report?.summary || "Autonomous investigation synthesis in progress.");
+    const reasoning = (dto.status === 'failed')
+      ? honestWarning
+      : (dto.report?.ai_reasoning || dto.report?.summary || "Multi-agent evaluation completed.");
 
     return {
       ...summary,

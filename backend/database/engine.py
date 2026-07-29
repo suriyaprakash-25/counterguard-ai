@@ -18,36 +18,45 @@ def _set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.close()
 
 
+# Singleton engine — created once at module import
+_engine: Optional[Engine] = None
+_session_maker: Optional[sessionmaker] = None
+
+
 def get_engine(db_url: Optional[str] = None, **kwargs) -> Engine:
     """
-    Create and return a SQLAlchemy database Engine.
-    Defaults to settings.DATABASE_URL or SQLite fallback if none is specified.
+    Return the singleton SQLAlchemy Engine.
+    Created once on first call, reused for all subsequent calls.
     """
-    url = db_url or settings.DATABASE_URL or "sqlite:///./counterguard.db"
-    connect_args = kwargs.pop("connect_args", {})
+    global _engine
+    if _engine is None:
+        url = db_url or settings.DATABASE_URL or "sqlite:///./counterguard.db"
+        connect_args = kwargs.pop("connect_args", {})
 
-    # If SQLite, add specific check_same_thread=False parameter and attach pragma listener
-    is_sqlite = url.startswith("sqlite")
-    if is_sqlite and "check_same_thread" not in connect_args:
-        connect_args["check_same_thread"] = False
+        is_sqlite = url.startswith("sqlite")
+        if is_sqlite and "check_same_thread" not in connect_args:
+            connect_args["check_same_thread"] = False
 
-    engine = create_engine(url, connect_args=connect_args, **kwargs)
+        _engine = create_engine(url, connect_args=connect_args, **kwargs)
 
-    if is_sqlite:
-        event.listen(engine, "connect", _set_sqlite_pragma)
+        if is_sqlite:
+            event.listen(_engine, "connect", _set_sqlite_pragma)
 
-    return engine
+    return _engine
 
 
 def get_session_maker(
     engine: Optional[Engine] = None, db_url: Optional[str] = None
 ) -> sessionmaker[Session]:
     """
-    Create and return a configured sessionmaker for creating database Sessions.
+    Return the singleton sessionmaker.
+    Created once on first call, reused for all subsequent calls.
     """
-    if engine is None:
-        engine = get_engine(db_url)
-    return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    global _session_maker
+    if _session_maker is None:
+        eng = engine or get_engine(db_url)
+        _session_maker = sessionmaker(bind=eng, autoflush=False, expire_on_commit=False)
+    return _session_maker
 
 
 def get_db_session() -> Generator[Session, None, None]:

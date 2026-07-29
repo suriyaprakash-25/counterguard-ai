@@ -53,23 +53,22 @@ describe("Dashboard Page", () => {
 
   it("renders the dashboard header", () => {
     renderDashboard();
-    expect(screen.getByText("CounterGuard Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Cyber Intelligence Operations Center")).toBeInTheDocument();
   });
 
   it("renders the metric cards after loading", async () => {
     renderDashboard();
-    // Assuming mock service returns 142 active investigations
     await waitFor(() => {
-      expect(screen.getByText("142")).toBeInTheDocument();
+      expect(screen.getByText("Active Investigations")).toBeInTheDocument();
     });
-    expect(screen.getByText("Active Investigations")).toBeInTheDocument();
-    expect(screen.getByText("Active Alerts")).toBeInTheDocument();
+    expect(screen.getByText("Total Investigations")).toBeInTheDocument();
+    expect(screen.getByText("Active Security Alerts")).toBeInTheDocument();
   });
 
   it("renders the investigations list widget", async () => {
     renderDashboard();
     await waitFor(() => {
-      expect(screen.getByText("Recent Investigations")).toBeInTheDocument();
+      expect(screen.getByText("Recent Cyber Investigations")).toBeInTheDocument();
       expect(screen.getByText("Suspicious iPhone 15 Pro Batch")).toBeInTheDocument();
     });
   });
@@ -80,7 +79,7 @@ describe("Dashboard Page", () => {
     );
     renderDashboard();
     await waitFor(() => {
-      expect(screen.getByText("No Investigations Found")).toBeInTheDocument();
+      expect(screen.getByText(/No Active Investigations Found/)).toBeInTheDocument();
     });
   });
 });

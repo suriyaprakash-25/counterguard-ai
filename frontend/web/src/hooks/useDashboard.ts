@@ -50,3 +50,17 @@ export const useFraudNodePreview = () => {
     queryFn: DashboardRepository.getFraudNodePreview,
   });
 };
+
+export const useSuspiciousSellers = () => {
+  return useQuery({
+    queryKey: ["dashboard", "suspicious-sellers"],
+    queryFn: DashboardRepository.getSuspiciousSellers,
+  });
+};
+
+export const useSwarmAgentStates = () => {
+  return useQuery({
+    queryKey: ["dashboard", "swarm-agent-states"],
+    queryFn: DashboardRepository.getSwarmAgentStates,
+  });
+};

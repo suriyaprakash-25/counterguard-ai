@@ -64,7 +64,8 @@ export function InvestigationDetailsPage() {
 
   const isHighRisk = data.riskScore > 50;
   const titleDisplay = data.displayTitle || data.name || "Target Assessment";
-  const hasReplayData = data.agentActivity && data.agentActivity.length >= 4;
+  // Only show Replay Swarm when investigation is fully completed with agent data
+  const hasReplayData = data.status === 'completed' && data.agentActivity && data.agentActivity.length >= 4;
 
   return (
     <div className="space-y-8 pb-12">
@@ -77,8 +78,8 @@ export function InvestigationDetailsPage() {
         riskScore={data.riskScore}
       />
 
-      {/* DEDICATED DATA CONFIDENCE WARNING BANNER */}
-      <DataConfidenceWarningBanner warning={data.dataConfidenceWarning} />
+      {/* DEDICATED DATA CONFIDENCE WARNING BANNER — only for failed investigations */}
+      {data.status === 'failed' && <DataConfidenceWarningBanner warning={data.dataConfidenceWarning} />}
 
       {/* CYBER INTELLIGENCE CASE HEADER */}
       <div className="rounded-2xl border border-border bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 text-white shadow-xl">

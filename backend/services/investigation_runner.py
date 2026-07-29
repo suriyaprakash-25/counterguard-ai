@@ -1,4 +1,5 @@
 import logging
+import time
 import traceback
 from datetime import datetime, timezone
 
@@ -23,6 +24,9 @@ class InvestigationRunner:
     @staticmethod
     def execute(investigation_id: str, request_dto: InvestigationRequest):
         logger.info(f"[Runner] Starting investigation {investigation_id}")
+        # Brief pause so the API session's SQLite commit is fully flushed
+        # before this thread opens a new DB session to read the investigation.
+        time.sleep(1)
 
         session_maker = get_session_maker()
         db_session = session_maker()
@@ -33,7 +37,9 @@ class InvestigationRunner:
             # --- 1. PENDING → IN_PROGRESS ---
             investigation = inv_repo.get_by_id(investigation_id)
             if not investigation:
-                logger.error(f"[Runner] Investigation {investigation_id} not found in DB.")
+                logger.error(
+                    f"[Runner] Investigation {investigation_id} not found in DB."
+                )
                 return
 
             investigation.status = "in_progress"
@@ -65,54 +71,64 @@ class InvestigationRunner:
             # One entry per finding
             num_findings = max(len(report.findings), 1)
             for finding in report.findings:
-                timeline_entries.append(EvidenceModel(
-                    investigation_id=investigation_id,
-                    agent="ReportGenerator",
-                    action="Finding Identified",
-                    detail=finding,
-                    confidence_delta=round(report.confidence / num_findings, 4),
-                    timestamp=now,
-                ))
+                timeline_entries.append(
+                    EvidenceModel(
+                        investigation_id=investigation_id,
+                        agent="ReportGenerator",
+                        action="Finding Identified",
+                        detail=finding,
+                        confidence_delta=round(report.confidence / num_findings, 4),
+                        timestamp=now,
+                    )
+                )
 
             # AI assessment summary
             if report.ai_summary:
-                timeline_entries.append(EvidenceModel(
-                    investigation_id=investigation_id,
-                    agent="CoordinatorAgent",
-                    action="AI Assessment Completed",
-                    detail=report.ai_summary,
-                    confidence_delta=report.confidence,
-                    timestamp=now,
-                ))
+                timeline_entries.append(
+                    EvidenceModel(
+                        investigation_id=investigation_id,
+                        agent="CoordinatorAgent",
+                        action="AI Assessment Completed",
+                        detail=report.ai_summary,
+                        confidence_delta=report.confidence,
+                        timestamp=now,
+                    )
+                )
 
             # Risk score entry
-            timeline_entries.append(EvidenceModel(
-                investigation_id=investigation_id,
-                agent="RiskAssessor",
-                action="Risk Score Assigned",
-                detail=(
-                    f"Risk Level: {report.risk_level} | Score: {report.risk_score}/100 | "
-                    f"{report.recommendation}"
-                ),
-                confidence_delta=report.confidence,
-                timestamp=now,
-            ))
+            timeline_entries.append(
+                EvidenceModel(
+                    investigation_id=investigation_id,
+                    agent="RiskAssessor",
+                    action="Risk Score Assigned",
+                    detail=(
+                        f"Risk Level: {report.risk_level} | Score: {report.risk_score}/100 | "
+                        f"{report.recommendation}"
+                    ),
+                    confidence_delta=report.confidence,
+                    timestamp=now,
+                )
+            )
 
             # AI reasoning entry
             if report.ai_reasoning:
-                timeline_entries.append(EvidenceModel(
-                    investigation_id=investigation_id,
-                    agent="ExplainabilityEngine",
-                    action="Reasoning Generated",
-                    detail=report.ai_reasoning,
-                    confidence_delta=0.0,
-                    timestamp=now,
-                ))
+                timeline_entries.append(
+                    EvidenceModel(
+                        investigation_id=investigation_id,
+                        agent="ExplainabilityEngine",
+                        action="Reasoning Generated",
+                        detail=report.ai_reasoning,
+                        confidence_delta=0.0,
+                        timestamp=now,
+                    )
+                )
 
             for ev in timeline_entries:
                 db_session.add(ev)
             db_session.commit()
-            logger.info(f"[Runner] Persisted {len(timeline_entries)} timeline events for {investigation_id}")
+            logger.info(
+                f"[Runner] Persisted {len(timeline_entries)} timeline events for {investigation_id}"
+            )
 
             # --- 5. IN_PROGRESS → COMPLETED ---
             investigation.status = "completed"
@@ -131,6 +147,8 @@ class InvestigationRunner:
                     investigation.status = "failed"
                     db_session.commit()
             except Exception as inner_err:
-                logger.error(f"[Runner] Could not mark investigation as failed: {inner_err}")
+                logger.error(
+                    f"[Runner] Could not mark investigation as failed: {inner_err}"
+                )
         finally:
             db_session.close()

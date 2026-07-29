@@ -11,7 +11,9 @@ export const InvestigationRepository = {
 
   async getInvestigation(id: string): Promise<InvestigationWorkspaceDetails> {
     const { data } = await apiClient.get(endpoints.investigations.details(id));
-    return InvestigationsMapper.toWorkspaceDetails(data.data);
+    // API returns { data: { investigation: {...} } } — unwrap the inner object
+    const dto = data.data?.investigation ?? data.data;
+    return InvestigationsMapper.toWorkspaceDetails(dto);
   },
 
   async getTimeline(id: string): Promise<TimelineEvent[]> {

@@ -42,10 +42,10 @@ describe("Investigation Workspace Page", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("INV-9001")).toBeInTheDocument();
+      expect(screen.getAllByText(/INV-9001/)[0]).toBeInTheDocument();
     });
 
     // Check Agent Activity
-    expect(screen.getByText("Agent Execution Log")).toBeInTheDocument();
+    expect(screen.getByText(/Agent Execution/i)).toBeInTheDocument();
   });
 });

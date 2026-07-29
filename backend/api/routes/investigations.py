@@ -1,4 +1,5 @@
 import logging
+import threading
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
@@ -164,22 +165,22 @@ def create_investigation(
 ):
     from backend.services.investigation_runner import InvestigationRunner
 
+    raw_target = (payload.target_value or "").strip()
+    raw_seller = (payload.seller or "").strip()
+
     listing_url = (
-        payload.target_value
+        raw_target
         if (
-            payload.target_value
+            raw_target
             and (
-                "http://" in payload.target_value
-                or "https://" in payload.target_value
-                or "search://" in payload.target_value
+                "http://" in raw_target
+                or "https://" in raw_target
+                or "search://" in raw_target
             )
         )
         else (
-            payload.seller
-            if (
-                "http://" in (payload.seller or "")
-                or "https://" in (payload.seller or "")
-            )
+            raw_seller
+            if ("http://" in raw_seller or "https://" in raw_seller)
             else f"search://{payload.brand or 'Brand'}/{payload.product or payload.name or 'Product'}"
         )
     )
@@ -195,6 +196,8 @@ def create_investigation(
     request_dto = InvestigationRequest(
         listing_url=inv.listing_url,
         marketplace=inv.marketplace,
+        brand=payload.brand or "",
+        product=payload.product or payload.name or "",
         investigation_type=payload.investigation_type,
         planner_strategy=payload.planner_strategy,
         objectives=payload.objectives or [],
@@ -202,7 +205,16 @@ def create_investigation(
         target_value=payload.target_value,
         advanced_options=payload.advanced_options,
     )
-    background_tasks.add_task(InvestigationRunner.execute, inv.id, request_dto)
+    # Run investigation in a separate daemon thread so it:
+    # 1. Does not block the FastAPI event loop
+    # 2. Cannot be killed by uvicorn --reload file watching
+    t = threading.Thread(
+        target=InvestigationRunner.execute,
+        args=(inv.id, request_dto),
+        daemon=True,
+        name=f"investigation-{inv.id[:8]}",
+    )
+    t.start()
 
     return {"data": {"id": inv.id}}
 
@@ -233,7 +245,13 @@ def retry_investigation(
         request_dto = InvestigationRequest(
             listing_url=inv.listing_url, marketplace=inv.marketplace
         )
-        background_tasks.add_task(InvestigationRunner.execute, inv.id, request_dto)
+        t = threading.Thread(
+            target=InvestigationRunner.execute,
+            args=(inv.id, request_dto),
+            daemon=True,
+            name=f"investigation-{inv.id[:8]}",
+        )
+        t.start()
     return {"data": {"success": True}}
 
 

@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 import urllib.parse
 from datetime import datetime, timezone
@@ -71,6 +72,10 @@ class RDAPWhoisAdapter(BaseProviderAdapter):
             except Exception:
                 pass
         target = target.split(":")[0].replace("www.", "")
+        # Remove spaces and invalid domain characters
+        target = re.sub(r"[^a-z0-9.-]", "", target)
+        if not target:
+            return "example.com"
         return target if "." in target else f"{target}.com"
 
     def _parse_rdap_response(

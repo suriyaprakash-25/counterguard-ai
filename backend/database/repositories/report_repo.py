@@ -22,6 +22,27 @@ class ReportRepository(IReportRepository):
 
     def add(self, report: ReportModel) -> ReportModel:
         try:
+            existing = self.get_by_investigation(report.investigation_id)
+            if existing:
+                existing.summary = report.summary
+                existing.product = report.product
+                existing.marketplace = report.marketplace
+                existing.seller = report.seller
+                existing.price = report.price
+                existing.risk_score = report.risk_score
+                existing.risk_level = report.risk_level
+                existing.evidence_summary = report.evidence_summary
+                existing.findings = report.findings
+                existing.recommendation = report.recommendation
+                existing.confidence = report.confidence
+                existing.ai_summary = report.ai_summary
+                existing.ai_reasoning = report.ai_reasoning
+                existing.investigation_timestamp = report.investigation_timestamp
+                existing.recommended_products = report.recommended_products
+                self._session.commit()
+                self._session.refresh(existing)
+                return existing
+
             self._session.add(report)
             self._session.commit()
             self._session.refresh(report)

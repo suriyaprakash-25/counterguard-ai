@@ -141,6 +141,45 @@ export function normalizeTarget(
       }
     }
 
+    // 2c2. Meesho product /slug/p/id segment
+    if (domain.includes('meesho')) {
+      const meeshoMatch = path.match(/\/([^/]+)\/p\//);
+      if (meeshoMatch) {
+        let slug = meeshoMatch[1].replace(/@[0-9]+$/, '').replace(/-/g, ' ').trim();
+        return {
+          displayTitle: toTitleCase(slug),
+          cleanUrl,
+          originalTarget: target,
+        };
+      }
+    }
+
+    // 2c3. AJIO product /slug/p/id segment
+    if (domain.includes('ajio')) {
+      const ajioMatch = path.match(/\/([^/]+)\/p\//);
+      if (ajioMatch) {
+        let slug = ajioMatch[1].replace(/[-_][0-9_]+$/, '').replace(/-/g, ' ').trim();
+        return {
+          displayTitle: toTitleCase(slug),
+          cleanUrl,
+          originalTarget: target,
+        };
+      }
+    }
+
+    // 2c4. Myntra product URL /category/brand/slug/id/buy
+    if (domain.includes('myntra')) {
+      const nonNumParts = path.split('/').filter(p => p && p.toLowerCase() !== 'buy' && !/^\d+$/.test(p));
+      if (nonNumParts.length > 0) {
+        const slug = nonNumParts[nonNumParts.length - 1].replace(/-/g, ' ').trim();
+        return {
+          displayTitle: toTitleCase(slug),
+          cleanUrl,
+          originalTarget: target,
+        };
+      }
+    }
+
     // 2d. eBay item /itm/
     if (domain.includes('ebay')) {
       const itemMatch = path.match(/\/itm\/([^/?]+)/);
@@ -163,6 +202,25 @@ export function normalizeTarget(
         cleanUrl,
         originalTarget: target,
       };
+    }
+
+    // 2f. Generic product URL path slug extraction
+    // e.g. /products/cmf-nothing-buds-c10776306.html, /product/slug, /item/slug
+    let slugMatch = path.match(/\/(?:products?|items?|goods|p|pd|detail|listing|buy)\/([^/?#]+)/i);
+    if (!slugMatch && path) {
+      slugMatch = path.match(/\/([^/]+-[^/]+(?:\.html?|\.aspx?)?)$/i);
+    }
+    if (slugMatch) {
+      let slug = slugMatch[1].replace(/\.(?:html?|aspx?|php)$/i, '');
+      slug = slug.replace(/-[a-z]?\d{5,}$/i, '');
+      const slugClean = decodeToken(slug).replace(/[-_]/g, ' ').trim();
+      if (slugClean.length > 3 && !/^\d+$/.test(slugClean)) {
+        return {
+          displayTitle: toTitleCase(slugClean),
+          cleanUrl,
+          originalTarget: target,
+        };
+      }
     }
 
     // 2f. Brand + product hints
@@ -227,19 +285,24 @@ function toTitleCase(str: string): string {
  * Priority: backend display_title → report product name → frontend normalization fallback.
  */
 export function resolveInvestigationTitle(dto: any): string {
-  // 1. Backend already normalized it
+  // 1. Backend display_title
   if (dto.display_title && !isRawUrl(dto.display_title)) {
     return dto.display_title;
   }
 
-  // 2. Report has a product name
+  // 2. Direct clean name provided in DTO
+  if (dto.name && !isRawUrl(dto.name) && !dto.name.startsWith('search://')) {
+    return dto.name;
+  }
+
+  // 3. Report has a product name
   const product = dto.product || dto.report?.product;
   if (product && product.length > 2 && !isRawUrl(product)) {
     return `${product} Assessment`;
   }
 
-  // 3. Frontend-side normalization of the listing URL
-  const rawTarget = dto.listing_url || dto.target_value || dto.name || '';
+  // 4. Frontend-side normalization of the listing URL
+  const rawTarget = dto.listing_url || dto.target_value || '';
   if (rawTarget) {
     const result = normalizeTarget(rawTarget);
     if (!isRawUrl(result.displayTitle)) {
@@ -247,7 +310,7 @@ export function resolveInvestigationTitle(dto: any): string {
     }
   }
 
-  // 4. Last resort: short ID
+  // 5. Last resort: short ID
   return `Investigation ${(dto.id || '').substring(0, 8)}`;
 }
 

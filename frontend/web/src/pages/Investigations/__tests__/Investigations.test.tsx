@@ -58,7 +58,7 @@ describe("Investigations List Page", () => {
     renderPage();
     await waitFor(() => {
       expect(screen.getByText("Suspicious iPhone 15 Pro Batch")).toBeInTheDocument();
-      expect(screen.getByText("Counterfeit Nike Air Max")).toBeInTheDocument();
+      expect(screen.getByText("Grey Market Sony Headphones")).toBeInTheDocument();
     });
   });
 });

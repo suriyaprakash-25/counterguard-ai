@@ -253,11 +253,18 @@ class BrandAgent(BaseSpecialistAgent):
 
         if tool_name == "trademark_lookup":
             return TrademarkInput(brand_name=brand)
+        elif tool_name == "product_catalog":
+            from backend.tools.mocks import CatalogInput
+
+            title = listing.title if listing and listing.title else "Product"
+            return CatalogInput(brand_name=brand, product_title=title)
         return None
 
     def _map_tool_result_to_state(self, tool_name: str, result: Any) -> dict:
         if tool_name == "trademark_lookup":
             return {"trademark_data": result}
+        elif tool_name == "product_catalog":
+            return {"catalog_data": result}
         return {}
 
     def _update_state(

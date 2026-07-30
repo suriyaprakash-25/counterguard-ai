@@ -37,7 +37,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    emptyOutDir: true,
+    emptyOutDir: true,   // First build: clears dist/ before rebuilding popup + options + background
     // Terser minification for maximum compression
     minify: 'terser',
     terserOptions: {
@@ -66,7 +66,8 @@ export default defineConfig({
         popup: resolve(__dirname, 'src/popup/index.html'),
         options: resolve(__dirname, 'src/options/index.html'),
         background: resolve(__dirname, 'src/background/index.ts'),
-        content: resolve(__dirname, 'src/content/index.ts'),
+        // NOTE: content script is built separately in vite.content.config.ts as IIFE
+        // Chrome content scripts cannot use ES module import syntax
       },
       output: {
         // Chunk splitting for source files (not node_modules — those are pre-bundled by Vite)

@@ -1,3 +1,4 @@
+from backend.schemas.discovery_engine import DiscoveryResult, SourceCandidate
 from backend.schemas.history import (
     DeleteInvestigationResponse,
     EvidenceItemSchema,
@@ -26,4 +27,6 @@ __all__ = [
     "InvestigationRequest",
     "RiskAssessment",
     "OfficialProductProfile",
+    "SourceCandidate",
+    "DiscoveryResult",
 ]

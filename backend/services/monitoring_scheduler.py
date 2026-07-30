@@ -99,8 +99,9 @@ class MonitoringScheduler:
 
             # Update job next_run in DB to match actual APScheduler next run time
             aps_job = self._scheduler.get_job(job_id)
-            if aps_job and aps_job.next_run_time:
-                job.next_run = _format_utc_iso(aps_job.next_run_time)
+            next_run_t = getattr(aps_job, "next_run_time", None) if aps_job else None
+            if next_run_t:
+                job.next_run = _format_utc_iso(next_run_t)
                 monitoring_job_repo.save(job)
 
             logger.info(
@@ -241,9 +242,10 @@ class MonitoringScheduler:
         self._schedule_job_in_apscheduler(job)
 
         aps_job = self._scheduler.get_job(job_id)
+        next_run_t = getattr(aps_job, "next_run_time", None) if aps_job else None
         next_run_str = (
-            _format_utc_iso(aps_job.next_run_time)
-            if aps_job and aps_job.next_run_time
+            _format_utc_iso(next_run_t)
+            if next_run_t
             else _format_utc_iso(datetime.now(timezone.utc) + timedelta(minutes=15))
         )
 

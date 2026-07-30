@@ -27,6 +27,17 @@ import {
 } from "lucide-react";
 import { InspectTabProps } from "../PopupPage";
 
+const formatAnalyzedAt = (dateVal?: string): string => {
+  if (!dateVal || dateVal === "Just now" || dateVal === "Invalid Date") return "Just now";
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return dateVal;
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return dateVal;
+  }
+};
+
 export const InspectTab = memo(function InspectTab({
   page,
   tabLoading,
@@ -334,7 +345,7 @@ export const InspectTab = memo(function InspectTab({
               },
               {
                 label: "Analyzed At",
-                value: analysis.analyzedAt ? new Date(analysis.analyzedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+                value: formatAnalyzedAt(analysis.analyzedAt),
                 cls: "text-slate-600 dark:text-slate-300 font-medium truncate block",
               },
             ].map((metric, i) => (

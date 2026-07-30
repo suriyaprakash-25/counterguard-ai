@@ -9,31 +9,47 @@ export function useActiveTab() {
   useEffect(() => {
     setLoading(true);
 
-    if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs[0];
-        if (activeTab && activeTab.url) {
-          try {
-            const urlObj = new URL(activeTab.url);
-            const host = urlObj.hostname.replace(/^www\./, "");
-            const detection = MarketplaceDetector.detect(activeTab.url);
+    const processTab = (activeTab?: chrome.tabs.Tab) => {
+      if (activeTab && activeTab.url) {
+        try {
+          const urlObj = new URL(activeTab.url);
+          const host = urlObj.hostname.replace(/^www\./, "");
+          const detection = MarketplaceDetector.detect(activeTab.url);
 
-            setPage({
-              url: activeTab.url,
-              domain: host,
-              title: activeTab.title || host,
-              faviconUrl: activeTab.favIconUrl,
-              isSupportedMarketplace: detection.isMarketplace,
-              marketplaceName: detection.isMarketplace ? detection.marketplace : undefined,
-              isSecure: urlObj.protocol === "https:",
-              detection: detection,
-            });
-          } catch {
-            setPage(null);
-          }
+          setPage({
+            url: activeTab.url,
+            domain: host,
+            title: activeTab.title || host,
+            faviconUrl: activeTab.favIconUrl,
+            isSupportedMarketplace: detection.isMarketplace,
+            marketplaceName: detection.isMarketplace ? detection.marketplace : undefined,
+            isSecure: urlObj.protocol === "https:",
+            detection: detection,
+          });
+        } catch {
+          setPage(null);
         }
+      } else {
+        setPage(null);
+      }
+      setLoading(false);
+    };
+
+    if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
+      try {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (chrome.runtime.lastError || !tabs || tabs.length === 0) {
+            chrome.tabs.query({ active: true, lastFocusedWindow: true }, (fallbackTabs) => {
+              processTab(fallbackTabs ? fallbackTabs[0] : undefined);
+            });
+          } else {
+            processTab(tabs[0]);
+          }
+        });
+      } catch (err) {
+        console.warn("[useActiveTab] Query error:", err);
         setLoading(false);
-      });
+      }
     } else {
       const currentUrl = typeof window !== "undefined" ? window.location.href : "about:blank";
       try {

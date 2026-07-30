@@ -57,10 +57,8 @@ import { PerformanceService } from "../services/performance.service";
 import { SkeletonCard, SkeletonGrid, SkeletonList } from "./components/SkeletonLoader";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-// ── Lazy-loaded tab content components ─────────────────────────────────────
-// Each tab is a separate chunk: only loaded when first activated.
-const InspectTab = lazy(() => import("./tabs/InspectTab").then(m => ({ default: m.InspectTab })));
-const HistoryTab = lazy(() => import("./tabs/HistoryTab").then(m => ({ default: m.HistoryTab })));
+import { InspectTab } from "./tabs/InspectTab";
+import { HistoryTab } from "./tabs/HistoryTab";
 
 interface ActiveInvState {
   id: string;

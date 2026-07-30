@@ -7,7 +7,8 @@ export type BadgeType =
   | "SUSPICIOUS"
   | "COUNTERFEIT_RISK"
   | "RECOMMENDED"
-  | "TRUSTED_SELLER";
+  | "TRUSTED_SELLER"
+  | "OFFLINE";
 
 export interface BadgeConfig {
   type: BadgeType;

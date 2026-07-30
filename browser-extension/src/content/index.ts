@@ -27,6 +27,7 @@ function injectOverlayStyles(): void {
 .cg-badge-suspicious{background:rgba(120,53,15,.9);border:1px solid rgba(245,158,11,.6);color:#fef08a}
 .cg-badge-counterfeit-risk{background:rgba(127,29,29,.95);border:1px solid rgba(239,68,68,.7);color:#fca5a5;animation:cg-pulse 2s cubic-bezier(.4,0,.6,1) infinite}
 .cg-badge-recommended{background:rgba(88,28,135,.95);border:1px solid rgba(168,85,247,.7);color:#e9d5ff}
+.cg-badge-offline{background:rgba(51,65,85,.9);border:1px dashed rgba(148,163,184,.6);color:#cbd5e1}
 .cg-tooltip{visibility:hidden;opacity:0;position:absolute;bottom:125%;left:50%;transform:translateX(-50%) translateY(4px);width:220px;background:#0f172a;border:1px solid #334155;color:#f8fafc;padding:8px 10px;border-radius:8px;font-size:10px;font-weight:500;line-height:1.4;box-shadow:0 10px 25px -5px rgba(0,0,0,.5);pointer-events:none;transition:all .2s ease-in-out;z-index:10000}
 .cg-badge-container:hover .cg-tooltip{visibility:visible;opacity:1;transform:translateX(-50%) translateY(0)}
 @keyframes cg-pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{opacity:.85;box-shadow:0 0 0 6px rgba(239,68,68,0)}}
@@ -52,7 +53,7 @@ if (detection.isMarketplace) {
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     ExtensionLogger.debug("[ContentScript] Received runtime message:", message);
-    
+
     if (message.type === "PING_CONTENT") {
       sendResponse({
         success: true,

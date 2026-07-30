@@ -7,6 +7,7 @@ import { ExtensionLogger } from "./logger.service";
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   backendUrl: "http://localhost:8000",
+  apiKey: "",                  // Empty = development/no-auth mode. Set in Options page for production.
   autoAnalyze: true,
   lightMode: false,
   notifications: true,

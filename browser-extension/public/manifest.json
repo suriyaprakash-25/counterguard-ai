@@ -20,7 +20,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*.amazon.in/*",
+        "*://*.amazon.com/*",
+        "*://*.flipkart.com/*",
+        "*://*.myntra.com/*",
+        "*://*.ajio.com/*",
+        "*://*.meesho.com/*",
+        "*://*.tradeindia.com/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
@@ -33,7 +41,14 @@
   ],
   "host_permissions": [
     "http://localhost:8000/*",
-    "<all_urls>"
+    "https://localhost:8000/*",
+    "*://*.amazon.in/*",
+    "*://*.amazon.com/*",
+    "*://*.flipkart.com/*",
+    "*://*.myntra.com/*",
+    "*://*.ajio.com/*",
+    "*://*.meesho.com/*",
+    "*://*.tradeindia.com/*"
   ],
   "icons": {
     "16": "icons/icon-16.png",

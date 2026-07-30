@@ -12,7 +12,10 @@ import {
   RotateCcw,
   ExternalLink,
   Globe,
-  Database
+  Database,
+  Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useChromeStorage } from "../hooks/useChromeStorage";
 import { BackendApiClient } from "../api/client";
@@ -25,6 +28,7 @@ export function OptionsPage() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -148,6 +152,64 @@ export function OptionsPage() {
                   <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
                 )}
                 <span>{testResult.message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 1B: API Key / Authentication */}
+          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <Lock className="h-4 w-4 text-purple-400" />
+              <span>API Key / Authentication</span>
+              <span className="ml-auto text-[10px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded">
+                Stored securely in Chrome Storage
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Enter your CounterGuard API key to authenticate requests to the backend.
+              Leave empty to run in <span className="text-amber-400 font-semibold">development mode</span> (no auth — works with local backend only).
+            </p>
+
+            <div className="relative">
+              <input
+                id="api-key-input"
+                type={showApiKey ? "text" : "password"}
+                value={form.apiKey ?? ""}
+                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 pr-12 text-xs font-mono text-white outline-none focus:border-purple-500 transition-colors"
+                placeholder="cg_sk_xxxxxxxxxxxxxxxxxxxx  (leave empty for dev mode)"
+                autoComplete="off"
+                aria-label="CounterGuard API Key"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                aria-label={showApiKey ? "Hide API key" : "Show API key"}
+              >
+                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            <div className="text-[10px] font-mono text-slate-500 space-y-1">
+              <p>• Keys starting with <code className="text-purple-300">cg_sk_</code> use <code className="text-purple-300">Bearer</code> authentication.</p>
+              <p>• Other keys use <code className="text-purple-300">ApiKey</code> authentication.</p>
+              <p>• The key is stored only in your browser's encrypted Chrome Storage — never sent to any third-party.</p>
+            </div>
+
+            {form.apiKey && form.apiKey.length > 0 && form.apiKey.length < 20 && (
+              <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-800/60 text-[10px] font-mono text-amber-300 flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                API key looks too short. CounterGuard keys are typically 40+ characters.
+              </div>
+            )}
+
+            {(!form.apiKey || form.apiKey.trim() === "") && (
+              <div className="p-2.5 rounded-lg bg-blue-950/40 border border-blue-800/60 text-[10px] font-mono text-blue-300 flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5 shrink-0" />
+                <span><strong>Dev mode active</strong> — requests sent without Authorization header. Safe for local backend only.</span>
               </div>
             )}
           </div>

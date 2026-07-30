@@ -2,6 +2,7 @@ import { MarketplaceDetectionResult } from "./marketplace";
 
 export interface ExtensionSettings {
   backendUrl: string;
+  apiKey: string;              // API key stored in Chrome Storage (never hardcoded)
   autoAnalyze: boolean;
   lightMode: boolean;
   notifications: boolean;

@@ -32,11 +32,11 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url && tab.url.startsWith("http")) {
     const settings = await ChromeStorageService.getSettings();
-    
+
     // Auto-analyze if enabled in settings
     if (settings.autoAnalyze) {
       const detection = MarketplaceDetector.detect(tab.url);
-      
+
       if (detection.isMarketplace && AutoAnalyzer.shouldAnalyze(tab.url)) {
         AutoAnalyzer.debounce(tab.url, async () => {
           ExtensionLogger.info(`[AutoAnalyzer] Triggering background auto-analysis for ${tab.url}`);
@@ -97,6 +97,15 @@ async function handleRuntimeMessage(message: ExtensionMessage): Promise<MessageR
         payload.query || payload.title
       );
       return { success: true, data: result };
+    }
+
+    case "ANALYZE_PRODUCT_CARD": {
+      const cardPayload = message.payload as any;
+      if (!cardPayload) {
+        return { success: false, error: "Missing card payload for analysis" };
+      }
+      const response = await BackendApiClient.analyzeProductCard(settings.backendUrl, cardPayload);
+      return { success: true, data: response };
     }
 
     default:

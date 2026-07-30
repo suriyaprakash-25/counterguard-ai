@@ -316,14 +316,34 @@ export class OverlayEngine {
     console.log(`✓ Request sent for card '${cardData.cardId}' ('${cardData.title.slice(0, 30)}')`);
 
     try {
-      const response = await BackendApiClient.analyzeProductCard(this.backendBaseUrl, {
-        title: cardData.title,
-        seller: cardData.seller,
-        price: cardData.price,
-        currency: "INR",
-        url: cardData.url,
-        marketplace: cardData.marketplace,
-      });
+      let response: BrowserAnalysisResponse | null = null;
+
+      // Delegate network fetch to Chrome Extension background service worker to bypass page Mixed Content & CORS restrictions
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+        response = await new Promise<BrowserAnalysisResponse | null>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "ANALYZE_PRODUCT_CARD", payload: cardData },
+            (res) => {
+              if (chrome.runtime.lastError || !res || !res.success || !res.data) {
+                resolve(null);
+              } else {
+                resolve(res.data);
+              }
+            }
+          );
+        });
+      }
+
+      if (!response) {
+        response = await BackendApiClient.analyzeProductCard(this.backendBaseUrl, {
+          title: cardData.title,
+          seller: cardData.seller,
+          price: cardData.price,
+          currency: "INR",
+          url: cardData.url,
+          marketplace: cardData.marketplace,
+        });
+      }
 
       console.log(`✓ Response received for card '${cardData.cardId}': Threat Level = '${response.threat_level}' (Score: ${response.risk_score})`);
       this.cardAnalysisCache.set(cardData.cardId, response);

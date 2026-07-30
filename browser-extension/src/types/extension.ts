@@ -67,6 +67,7 @@ export type MessageType =
   | "UPDATE_SETTINGS"
   | "GET_BACKEND_STATUS"
   | "ANALYZE_TAB"
+  | "ANALYZE_PRODUCT_CARD"
   | "TAB_UPDATED"
   | "CONTENT_SCRIPT_READY";
 

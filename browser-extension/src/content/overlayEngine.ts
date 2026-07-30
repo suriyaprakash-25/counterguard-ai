@@ -368,8 +368,8 @@ export class OverlayEngine {
       case "SAFE":
         return "VERIFIED";
       case "MEDIUM":
-        return "SUSPICIOUS";
       case "HIGH":
+        return "SUSPICIOUS";
       case "CRITICAL":
         return "COUNTERFEIT_RISK";
       default:

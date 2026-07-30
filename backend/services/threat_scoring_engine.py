@@ -71,7 +71,7 @@ class ThreatScoringEngine:
         except Exception as err:
             logger.debug(f"[ThreatScoringEngine] Live MSRP lookup notice: {err}")
 
-        if msrp <= 0:
+        if msrp <= 0 or msrp > 4500.0:
             if "sony" in title_lower or "wh-1000xm5" in title_lower:
                 msrp = 24990.0
             elif "airpods" in title_lower:
@@ -105,7 +105,7 @@ class ThreatScoringEngine:
             explainability.append("+40 (Zero/Missing Price Anomaly)")
         elif msrp > 0 and price < msrp:
             deviation_pct = ((msrp - price) / msrp) * 100.0
-            if deviation_pct >= 80.0:
+            if deviation_pct >= 85.0:
                 price_penalty = 65.0
                 findings.append(
                     f"Severe price anomaly ({deviation_pct:.1f}% below MSRP ₹{msrp:,.2f}) — replica liquidation pattern"
@@ -113,7 +113,7 @@ class ThreatScoringEngine:
                 explainability.append(
                     f"+65 (Severe Price Anomaly -{deviation_pct:.1f}% vs MSRP ₹{msrp:,.2f})"
                 )
-            elif deviation_pct >= 55.0:
+            elif deviation_pct >= 70.0:
                 price_penalty = 45.0
                 findings.append(
                     f"High price anomaly ({deviation_pct:.1f}% below MSRP ₹{msrp:,.2f}) — suspicious discount"
@@ -121,7 +121,7 @@ class ThreatScoringEngine:
                 explainability.append(
                     f"+45 (High Price Anomaly -{deviation_pct:.1f}% vs MSRP ₹{msrp:,.2f})"
                 )
-            elif deviation_pct >= 30.0:
+            elif deviation_pct >= 45.0:
                 price_penalty = 25.0
                 findings.append(
                     f"Moderate price deviation ({deviation_pct:.1f}% below MSRP ₹{msrp:,.2f})"
@@ -129,7 +129,7 @@ class ThreatScoringEngine:
                 explainability.append(
                     f"+25 (Moderate Price Deviation -{deviation_pct:.1f}%)"
                 )
-            elif deviation_pct >= 15.0:
+            elif deviation_pct >= 25.0:
                 price_penalty = 10.0
                 explainability.append(
                     f"+10 (Minor Price Variance -{deviation_pct:.1f}%)"
@@ -142,7 +142,7 @@ class ThreatScoringEngine:
                     f"0 (Price Aligns with Baseline MSRP ₹{msrp:,.2f})"
                 )
 
-        # 3. Seller Identity & Trust Score
+        # 3. Seller Identity & Brand Verification
         seller_trust = 85.0
         seller_adj = 0.0
 
@@ -153,6 +153,8 @@ class ThreatScoringEngine:
             "authorized",
             "direct",
             "brand store",
+            "cmf by nothing",
+            "nothing buds",
         ]
         unverified_keywords = [
             "unverified",
@@ -163,17 +165,36 @@ class ThreatScoringEngine:
             "bazaar",
             "replica",
         ]
+        clone_brand_keywords = [
+            "gwalbros",
+            "cmt tws",
+            "cmt pro",
+            "urban zone",
+            "hadphone",
+            "replica",
+        ]
+
+        # Check clone brand mismatch in title
+        if any(k in title_lower for k in clone_brand_keywords):
+            seller_adj += 35.0
+            findings.append(
+                "Third-party clone / replica brand prefix detected in title"
+            )
+            explainability.append("+35 (Clone / Replica Brand Match)")
 
         if any(k in seller_lower for k in authorized_keywords) or any(
-            k in title_lower for k in ["official", "authorized"]
+            k in title_lower
+            for k in ["cmf by nothing", "nothing buds", "official", "authorized"]
         ):
             seller_trust = 98.0
-            seller_adj = -20.0
-            findings.append("Seller matched verified authorized distributor database")
-            explainability.append("-20 (Authorized Distributor Credentials Verified)")
+            seller_adj -= 15.0
+            findings.append(
+                "Product & seller matched verified authorized brand catalog"
+            )
+            explainability.append("-15 (Authorized Catalog & Seller Verification)")
         elif any(k in seller_lower for k in unverified_keywords):
             seller_trust = 35.0
-            seller_adj = 25.0
+            seller_adj += 25.0
             findings.append("Unverified or unauthorized seller entity")
             explainability.append("+25 (Unverified/High-Risk Seller Entity)")
         else:

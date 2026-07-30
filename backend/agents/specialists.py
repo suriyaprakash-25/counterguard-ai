@@ -7,6 +7,7 @@ from backend.collaboration.models.context import (
     AgentObservation,
     InvestigationContext,
 )
+from backend.memory.models.domain import Evidence
 from backend.prompts.specialist_prompts import (
     BRAND_SYSTEM_PROMPT,
     PRICE_SYSTEM_PROMPT,
@@ -157,6 +158,38 @@ class PriceAgent(BaseSpecialistAgent):
         self, state: InvestigationState, result: PriceAnalysisResult
     ) -> dict:
         new_context = InvestigationContext(investigation_id="temp")
+        prior_context = state.get("context")
+        prior_ev_ids = (
+            [e.evidence_id for e in prior_context.shared_evidence]
+            if prior_context and hasattr(prior_context, "shared_evidence")
+            else []
+        )
+
+        sev = (
+            "critical"
+            if result.risk_score > 75
+            else (
+                "high"
+                if result.risk_score > 50
+                else ("medium" if result.risk_score > 25 else "low")
+            )
+        )
+        ev = Evidence(
+            agent_name="PriceAgent",
+            source_agent="PriceAgent",
+            category="PRICE",
+            title="Price Anomaly Analysis",
+            description=result.reasoning,
+            severity=sev,
+            confidence=round(max(0.1, result.risk_score / 100.0), 2),
+            source="price_history",
+            derived_from=prior_ev_ids,
+            metadata={
+                "risk_score": result.risk_score,
+                "anomaly_detected": getattr(result, "anomaly_detected", False),
+            },
+        )
+        new_context.add_evidence(ev, derived_from_ids=prior_ev_ids)
         new_context.shared_observations.append(
             AgentObservation(
                 source_agent="PriceAgent",
@@ -218,16 +251,64 @@ class SellerAgent(BaseSpecialistAgent):
     def _update_state(
         self, state: InvestigationState, result: SellerAnalysisResult
     ) -> dict:
+        prior_context = state.get("context")
+        prior_ev = (
+            prior_context.shared_evidence
+            if prior_context and hasattr(prior_context, "shared_evidence")
+            else []
+        )
+        prior_ev_ids = [e.evidence_id for e in prior_ev]
+        price_flagged = any(
+            e.agent_name == "PriceAgent" and e.severity in ["critical", "high"]
+            for e in prior_ev
+        )
+
+        adjusted_risk = result.risk_score
+        reasoning_suffix = ""
+        if price_flagged and adjusted_risk > 35:
+            adjusted_risk = min(100, int(adjusted_risk * 1.15))
+            reasoning_suffix = (
+                " (Suspicion elevated due to concurrent severe price anomaly)"
+            )
+
+        sev = (
+            "critical"
+            if adjusted_risk > 75
+            else (
+                "high"
+                if adjusted_risk > 50
+                else ("medium" if adjusted_risk > 25 else "low")
+            )
+        )
         new_context = InvestigationContext(investigation_id="temp")
+        ev = Evidence(
+            agent_name="SellerAgent",
+            source_agent="SellerAgent",
+            category="SELLER",
+            title="Seller Identity & WHOIS Audit",
+            description=f"{result.reasoning}{reasoning_suffix}",
+            severity=sev,
+            confidence=round(max(0.1, adjusted_risk / 100.0), 2),
+            source="whois_reputation",
+            derived_from=prior_ev_ids,
+            metadata={
+                "risk_score": adjusted_risk,
+                "reputation_risk": getattr(result, "reputation_risk", "Medium"),
+            },
+        )
+        new_context.add_evidence(ev, derived_from_ids=prior_ev_ids)
         new_context.shared_observations.append(
             AgentObservation(
                 source_agent="SellerAgent",
-                content=f"Risk Score: {result.risk_score}. Reasoning: {result.reasoning}",
+                content=f"Risk Score: {adjusted_risk}. Reasoning: {result.reasoning}{reasoning_suffix}",
                 metadata={
                     "reputation_risk": getattr(result, "reputation_risk", "Medium")
                 },
             )
         )
+        result.risk_score = adjusted_risk
+        if reasoning_suffix:
+            result.reasoning = f"{result.reasoning}{reasoning_suffix}"
         return {"seller_analysis": result, "context": new_context}
 
     def _get_fallback(self) -> SellerAnalysisResult:
@@ -271,6 +352,30 @@ class BrandAgent(BaseSpecialistAgent):
         self, state: InvestigationState, result: BrandAnalysisResult
     ) -> dict:
         new_context = InvestigationContext(investigation_id="temp")
+        sev = (
+            "critical"
+            if result.risk_score > 75
+            else (
+                "high"
+                if result.risk_score > 50
+                else ("medium" if result.risk_score > 25 else "low")
+            )
+        )
+        ev = Evidence(
+            agent_name="BrandAgent",
+            source_agent="BrandAgent",
+            category="Brand",
+            title="Trademark & Catalog Authenticity Audit",
+            description=result.reasoning,
+            severity=sev,
+            confidence=round(max(0.1, result.risk_score / 100.0), 2),
+            source="trademark_catalog",
+            metadata={
+                "risk_score": result.risk_score,
+                "authenticity_flags": getattr(result, "authenticity_flags", []),
+            },
+        )
+        new_context.add_evidence(ev)
         new_context.shared_observations.append(
             AgentObservation(
                 source_agent="BrandAgent",
@@ -322,6 +427,32 @@ class ReviewAgent(BaseSpecialistAgent):
         self, state: InvestigationState, result: ReviewAnalysisResult
     ) -> dict:
         new_context = InvestigationContext(investigation_id="temp")
+        sev = (
+            "critical"
+            if result.risk_score > 75
+            else (
+                "high"
+                if result.risk_score > 50
+                else ("medium" if result.risk_score > 25 else "low")
+            )
+        )
+        ev = Evidence(
+            agent_name="ReviewAgent",
+            source_agent="ReviewAgent",
+            category="Review",
+            title="Review & Visual Image Forensics",
+            description=result.reasoning,
+            severity=sev,
+            confidence=round(max(0.1, result.risk_score / 100.0), 2),
+            source="reverse_image_search",
+            metadata={
+                "risk_score": result.risk_score,
+                "fake_reviews_detected": getattr(
+                    result, "fake_reviews_detected", False
+                ),
+            },
+        )
+        new_context.add_evidence(ev)
         new_context.shared_observations.append(
             AgentObservation(
                 source_agent="ReviewAgent",

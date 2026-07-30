@@ -141,10 +141,13 @@ class VisualForensicsAgent(BaseAgent):
 
         if image_url.startswith("http://") or image_url.startswith("https://"):
             try:
+                import ssl
+
+                ctx = ssl._create_unverified_context()
                 req = urllib.request.Request(
                     image_url, headers={"User-Agent": "Mozilla/5.0"}
                 )
-                with urllib.request.urlopen(req, timeout=10) as resp:
+                with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
                     return Image.open(io.BytesIO(resp.read())).convert("RGB")
             except Exception as e:
                 logger.warning(f"Failed to fetch listing image from '{image_url}': {e}")

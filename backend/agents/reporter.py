@@ -133,6 +133,7 @@ class ReportGenerator:
         scraping_result: Optional[ScrapingResult] = None,
         visual_findings: Optional[List[str]] = None,
         visual_similarity: Optional[float] = None,
+        context: Optional[Any] = None,
     ) -> InvestigationReport:
         """
         Synthesizes findings into a unified, zero-contradiction human-readable report.
@@ -178,6 +179,7 @@ class ReportGenerator:
             findings_list=findings,
             brand_name=analysis.brand,
             data_source=data_source,
+            context=context,
         )
 
         # Run pre-persistence consistency validation & repair if not fallback mode
@@ -220,4 +222,26 @@ class ReportGenerator:
             investigation_timestamp=datetime.now(timezone.utc).isoformat(),
             recommended_products=recommended_products or [],
             data_confidence_warning=unified.data_confidence_warning,
+            overall_confidence=getattr(
+                unified, "overall_confidence", unified.confidence
+            ),
+            overall_reasoning=getattr(unified, "overall_reasoning", []),
+            supporting_evidence=getattr(unified, "supporting_evidence", []),
+            conflicting_evidence=getattr(unified, "conflicting_evidence", []),
+            recommended_actions=[
+                a.model_dump(mode="json")
+                if hasattr(a, "model_dump")
+                else (a if isinstance(a, dict) else {"action": str(a)})
+                for a in getattr(unified, "recommended_actions", [])
+            ],
+            confidence_timeline=[
+                c.model_dump(mode="json") if hasattr(c, "model_dump") else c
+                for c in (
+                    context.confidence_timeline
+                    if context and hasattr(context, "confidence_timeline")
+                    else []
+                )
+            ],
+            reasoning_timeline=getattr(unified, "reasoning_timeline", []),
+            evidence_graph=getattr(unified, "evidence_graph", {}),
         )

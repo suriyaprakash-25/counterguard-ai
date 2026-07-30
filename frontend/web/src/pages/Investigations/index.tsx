@@ -7,20 +7,30 @@ import { Badge } from "../../components/common/Badge";
 import { LoadingSkeleton } from "../../components/common/LoadingSkeleton";
 import { ErrorState } from "../../components/common/ErrorState";
 import { EmptyState } from "../../components/common/EmptyState";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Sparkles } from "lucide-react";
 import { Button } from "../../components/common/Button";
 import type { InvestigationSummary } from "../../types/investigations";
 import { CreateInvestigationDialog } from "./CreateInvestigationDialog";
 import { RoleGuard } from "../../features/auth/components/RoleGuard";
-
 import { Scale } from "lucide-react";
 import { InvestigationComparisonModal } from "./InvestigationComparisonModal";
+import { ProductDiscoveryDrawer } from "../../components/discovery/ProductDiscoveryDrawer";
+
 
 export default function Investigations() {
   const { data, isLoading, isError, refetch } = useInvestigations(1, {});
   const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [isDiscoveryOpen, setIsDiscoveryOpen] = useState(false);
+  const [discoveryPrefillUrl, setDiscoveryPrefillUrl] = useState('');
+  const [discoveryPrefillTitle, setDiscoveryPrefillTitle] = useState('');
+
+  const handleInvestigateCandidate = (url: string, title: string) => {
+    setDiscoveryPrefillUrl(url);
+    setDiscoveryPrefillTitle(title);
+    setIsDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -35,6 +45,14 @@ export default function Investigations() {
               <Scale className="mr-2 h-4 w-4" /> Compare Cases
             </Button>
           )}
+          <Button
+            id="open-product-discovery-btn"
+            variant="outline"
+            onClick={() => setIsDiscoveryOpen(true)}
+            className="border-violet-500/40 text-violet-300 hover:bg-violet-500/10"
+          >
+            <Sparkles className="mr-2 h-4 w-4" /> Discover Products
+          </Button>
           <RoleGuard require="Investigator">
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> New Investigation
@@ -43,7 +61,18 @@ export default function Investigations() {
         </div>
       </div>
 
-      <CreateInvestigationDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} />
+      <ProductDiscoveryDrawer
+        isOpen={isDiscoveryOpen}
+        onClose={() => setIsDiscoveryOpen(false)}
+        onInvestigateUrl={handleInvestigateCandidate}
+      />
+
+      <CreateInvestigationDialog
+        isOpen={isDialogOpen}
+        onClose={() => { setIsDialogOpen(false); setDiscoveryPrefillUrl(''); setDiscoveryPrefillTitle(''); }}
+        initialUrl={discoveryPrefillUrl}
+        initialTitle={discoveryPrefillTitle}
+      />
       {data && (
         <InvestigationComparisonModal
           isOpen={isCompareOpen}

@@ -24,6 +24,28 @@ class InvestigationService:
         initial_state: InvestigationState = {"request": request}
 
         try:
+            # Search organizational memory precedents before final report generation
+            try:
+                from backend.agents.historical_memory_agent import (
+                    historical_memory_agent,
+                )
+
+                search_query = (
+                    getattr(request, "raw_text", None)
+                    or getattr(request, "listing_url", None)
+                    or "Counterfeit Audit"
+                )
+                mem_resp = historical_memory_agent.search_similar_investigations(
+                    search_query
+                )
+                logger.info(
+                    f"[InvestigationService] Pre-investigation organizational memory search: {mem_resp.total_matches} precedents found."
+                )
+            except Exception as mem_err:
+                logger.warning(
+                    f"[InvestigationService] Organizational memory search fallback: {mem_err}"
+                )
+
             # LangGraph's invoke returns the final state dict
             final_state = graph.invoke(initial_state)
 

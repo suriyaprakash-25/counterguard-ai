@@ -7,6 +7,12 @@ from backend.agents.analyzer import AnalyzerAgent
 from backend.agents.assessor import RiskAssessor
 from backend.agents.collector import EvidenceCollector
 from backend.agents.coordinator import CoordinatorAgent
+from backend.agents.intelligence_agents import (
+    AuthorizedSellerAgent,
+    BrandIntelligenceAgent,
+    MetadataIntelligenceAgent,
+    SpecificationValidationAgent,
+)
 from backend.agents.planner import PlanningAgent
 from backend.agents.reporter import ReportGenerator
 from backend.agents.specialists import BrandAgent, PriceAgent, ReviewAgent, SellerAgent
@@ -72,6 +78,12 @@ def build_graph() -> StateGraph:  # noqa: C901
     coordinator_agent = CoordinatorAgent()
     trusted_product_agent = TrustedProductAgent()
 
+    # 4 New Intelligence Agents
+    brand_intel_agent = BrandIntelligenceAgent()
+    spec_validation_agent = SpecificationValidationAgent()
+    authorized_seller_agent = AuthorizedSellerAgent()
+    metadata_intel_agent = MetadataIntelligenceAgent()
+
     # -- Node Wrappers --
     def node_scrape(state: InvestigationState):
         """
@@ -107,6 +119,7 @@ def build_graph() -> StateGraph:  # noqa: C901
                 state.get("scraping_result"),
                 state.get("visual_findings"),
                 state.get("visual_similarity"),
+                context=state.get("context"),
             )
         }
 
@@ -126,6 +139,10 @@ def build_graph() -> StateGraph:  # noqa: C901
                     "BrandAgent",
                     "ReviewAgent",
                     "VisualForensicsAgent",
+                    "BrandIntelligenceAgent",
+                    "SpecificationValidationAgent",
+                    "AuthorizedSellerAgent",
+                    "MetadataIntelligenceAgent",
                 ]
 
         node_map = {
@@ -134,6 +151,10 @@ def build_graph() -> StateGraph:  # noqa: C901
             "BrandAgent": "brand_agent",
             "ReviewAgent": "review_agent",
             "VisualForensicsAgent": "visual",
+            "BrandIntelligenceAgent": "brand_intel",
+            "SpecificationValidationAgent": "spec_validation",
+            "AuthorizedSellerAgent": "authorized_seller",
+            "MetadataIntelligenceAgent": "metadata_intel",
         }
 
         destinations = [node_map[s] for s in selected if s in node_map]
@@ -154,6 +175,11 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_node("review_agent", review_agent.run)
     graph.add_node("visual", visual_agent.run)
 
+    graph.add_node("brand_intel", brand_intel_agent.run)
+    graph.add_node("spec_validation", spec_validation_agent.run)
+    graph.add_node("authorized_seller", authorized_seller_agent.run)
+    graph.add_node("metadata_intel", metadata_intel_agent.run)
+
     graph.add_node("coordinator", coordinator_agent.run)
     graph.add_node("trusted_product", trusted_product_agent.run)
     graph.add_node("reporter", node_report)
@@ -172,6 +198,11 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_edge("brand_agent", "coordinator")
     graph.add_edge("review_agent", "coordinator")
     graph.add_edge("visual", "coordinator")
+
+    graph.add_edge("brand_intel", "coordinator")
+    graph.add_edge("spec_validation", "coordinator")
+    graph.add_edge("authorized_seller", "coordinator")
+    graph.add_edge("metadata_intel", "coordinator")
 
     graph.add_edge("coordinator", "trusted_product")
     graph.add_edge("trusted_product", "reporter")

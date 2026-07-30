@@ -1,6 +1,6 @@
 import logging
 import traceback
-from typing import Dict, Any, List
+from typing import Any, Dict
 
 from backend.schemas.recommendation import TrustedProductResult
 from backend.services.product_search_service import ProductSearchService
@@ -41,22 +41,22 @@ class TrustedProductAgent:
         try:
             # Execute Real Retrieval across search providers
             retrieved_items = self.search_service.search_trusted_products(
-                raw_title=raw_title,
-                brand_hint=brand_hint,
-                target_price=target_price
+                raw_title=raw_title, brand_hint=brand_hint, target_price=target_price
             )
 
             if not retrieved_items:
-                logger.info("Zero verified genuine products passed retrieval and domain validation.")
+                logger.info(
+                    "Zero verified genuine products passed retrieval and domain validation."
+                )
                 return {
                     "trusted_product_result": TrustedProductResult(
                         normalized_product=normalized,
                         recommended_products=[],
                         comparison=None,
                         search_status="no_verified_products_found",
-                        message="No verified genuine product could be located from trusted sources."
+                        message="No verified genuine product could be located from trusted sources.",
                     ),
-                    "recommended_products": []
+                    "recommended_products": [],
                 }
 
             top_item = retrieved_items[0]
@@ -73,7 +73,7 @@ class TrustedProductAgent:
                     "seller_trust": "Low / Unverified",
                     "risk_score": risk_val,
                     "authenticity": "High Counterfeit Risk",
-                    "domain": "unverified"
+                    "domain": "unverified",
                 },
                 "verified_product": {
                     "title": top_item.product_name,
@@ -84,8 +84,10 @@ class TrustedProductAgent:
                     "seller_trust": f"{top_item.store_type} / Verified",
                     "risk_score": 0,
                     "authenticity": "100% Genuine Guaranteed",
-                    "domain": top_item.provenance.domain if hasattr(top_item, 'provenance') else top_item.domain
-                }
+                    "domain": top_item.provenance.domain
+                    if hasattr(top_item, "provenance")
+                    else top_item.domain,
+                },
             }
 
             result = TrustedProductResult(
@@ -93,13 +95,35 @@ class TrustedProductAgent:
                 recommended_products=retrieved_items,
                 comparison=comparison,
                 search_status="success",
-                message=f"Retrieved {len(retrieved_items)} verified recommendations from trusted sources."
+                message=f"Retrieved {len(retrieved_items)} verified recommendations from trusted sources.",
             )
 
-            logger.info(f"TrustedProductAgent successfully retrieved {len(retrieved_items)} verified products.")
+            from backend.collaboration.models.context import InvestigationContext
+            from backend.memory.models.domain import Evidence
+
+            new_context = InvestigationContext(investigation_id="temp")
+            ev = Evidence(
+                agent_name="TrustedProductAgent",
+                source_agent="TrustedProductAgent",
+                category="Memory",
+                title="Retrieval-Augmented Provenance Search",
+                description=f"Retrieved {len(retrieved_items)} verified genuine listings for provenance comparison.",
+                severity="info" if len(retrieved_items) > 0 else "medium",
+                confidence=0.95 if len(retrieved_items) > 0 else 0.5,
+                source="product_search_service",
+                metadata={"recommendations_count": len(retrieved_items)},
+            )
+            new_context.add_evidence(ev)
+
+            logger.info(
+                f"TrustedProductAgent successfully retrieved {len(retrieved_items)} verified products."
+            )
             return {
                 "trusted_product_result": result,
-                "recommended_products": [r.model_dump(mode="json") for r in retrieved_items]
+                "recommended_products": [
+                    r.model_dump(mode="json") for r in retrieved_items
+                ],
+                "context": new_context,
             }
 
         except Exception as e:
@@ -112,7 +136,7 @@ class TrustedProductAgent:
                     recommended_products=[],
                     comparison=None,
                     search_status="error",
-                    message="No verified genuine product could be located from trusted sources."
+                    message="No verified genuine product could be located from trusted sources.",
                 ),
-                "recommended_products": []
+                "recommended_products": [],
             }

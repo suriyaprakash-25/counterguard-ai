@@ -225,6 +225,8 @@ class InvestigationHistoryService:
             consensus = None
             memory_context = None
             agent_activity = []
+            risk_score = 0  # default safe value if no report
+            vote_str = "UNKNOWN"  # default safe value if no report
 
             if report_model and inv.status != "failed":
                 agreement_score = (

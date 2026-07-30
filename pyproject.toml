@@ -16,6 +16,7 @@ ignore = ["E501"]
 
 minversion = "7.0"
 addopts = "-ra -q -p no:warnings"
+asyncio_mode = "auto"
 testpaths = [
     "backend/tests",
 ]

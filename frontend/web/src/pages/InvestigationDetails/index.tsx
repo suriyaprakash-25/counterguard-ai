@@ -22,14 +22,24 @@ import { ReplayModal } from "../../components/investigations/ReplayModal";
 import { AskCounterGuardWidget } from "../../components/investigations/AskCounterGuardWidget";
 import { ReportExportService } from "../../services/report_export_service";
 import { ExecutionTracePanel } from "../../components/investigations/ExecutionTracePanel";
+import { RiskExplanationCard } from "../../components/investigations/RiskExplanationCard";
+import { SharedBlackboardPanel } from "../../components/investigations/SharedBlackboardPanel";
+import { CoordinatorReasoningCard } from "../../components/investigations/CoordinatorReasoningCard";
+import { EvidenceTimelineSection } from "../../components/investigations/EvidenceTimelineSection";
+import { EvidenceGraphCanvas } from "../../components/investigations/EvidenceGraphCanvas";
+import { InvestigationFlowPanel } from "../../components/investigations/InvestigationFlowPanel";
+import { StructuredReasoningTimeline } from "../../components/investigations/StructuredReasoningTimeline";
+import { CaseAuditTimeline } from "./components/CaseAuditTimeline";
 import { Button } from "../../components/common/Button";
 import { Badge } from "../../components/common/Badge";
-import { ArrowLeft, ExternalLink, RefreshCw, AlertCircle, ShieldAlert, Play, Clock, Hash, Tag, Store, FileText } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, AlertCircle, ShieldAlert, Play, Clock, Hash, Tag, Store, FileText, Network } from "lucide-react";
+import { ListingLineageDrawer } from "../../components/common/ListingLineageDrawer";
 
 export function InvestigationDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isReplayOpen, setIsReplayOpen] = useState(false);
+  const [isLineageOpen, setIsLineageOpen] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useInvestigationDetails(id || "");
 
@@ -64,7 +74,6 @@ export function InvestigationDetailsPage() {
 
   const isHighRisk = data.riskScore > 50;
   const titleDisplay = data.displayTitle || data.name || "Target Assessment";
-  // Only show Replay Swarm when investigation is fully completed with agent data
   const hasReplayData = data.status === 'completed' && data.agentActivity && data.agentActivity.length >= 4;
 
   return (
@@ -78,14 +87,13 @@ export function InvestigationDetailsPage() {
         riskScore={data.riskScore}
       />
 
-      {/* DEDICATED DATA CONFIDENCE WARNING BANNER — only for failed investigations */}
+      {/* DEDICATED DATA CONFIDENCE WARNING BANNER */}
       {data.status === 'failed' && <DataConfidenceWarningBanner warning={data.dataConfidenceWarning} />}
 
       {/* CYBER INTELLIGENCE CASE HEADER */}
       <div className="rounded-2xl border border-border bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 text-white shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-3">
-            {/* Top Meta Line */}
             <div className="flex items-center gap-3 text-xs">
               <Button
                 variant="ghost"
@@ -111,7 +119,6 @@ export function InvestigationDetailsPage() {
               </span>
             </div>
 
-            {/* Case Title */}
             <div className="flex items-center gap-3 pt-1">
               <div className="h-10 w-10 rounded-xl bg-primary/30 border border-primary/50 flex items-center justify-center text-primary-light shrink-0">
                 <ShieldAlert className="h-6 w-6" />
@@ -129,7 +136,6 @@ export function InvestigationDetailsPage() {
             </div>
           </div>
 
-          {/* Action Buttons & Risk Metric Pill */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0 pt-2 lg:pt-0">
             <div className="p-3 rounded-xl bg-slate-800/90 border border-slate-700 flex items-center gap-3">
               <div className={`h-3 w-3 rounded-full ${isHighRisk ? 'bg-red-500 animate-pulse' : 'bg-emerald-400'}`} />
@@ -154,6 +160,13 @@ export function InvestigationDetailsPage() {
               <Button
                 variant="outline"
                 className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
+                onClick={() => setIsLineageOpen(true)}
+              >
+                <Network className="mr-1.5 h-4 w-4 text-emerald-400" /> Evidence Lineage
+              </Button>
+              <Button
+                variant="outline"
+                className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
                 onClick={() => ReportExportService.generatePrintableReport(data)}
               >
                 <FileText className="mr-1.5 h-4 w-4" /> Export Report
@@ -166,77 +179,133 @@ export function InvestigationDetailsPage() {
             </div>
           </div>
         </div>
+
+        {/* Lineage Drawer Component */}
+        <ListingLineageDrawer
+          candidateId={data.id}
+          isOpen={isLineageOpen}
+          onClose={() => setIsLineageOpen(false)}
+        />
       </div>
 
       <div className="grid gap-8">
-        {/* SECTION 1: Provider Health SLA Dashboard */}
+        {/* SECTION 1: Risk Explanation Card */}
+        <section>
+          <RiskExplanationCard
+            riskScore={data.riskScore}
+            reasoningBullets={data.overallReasoning}
+            marketplace={data.marketplace}
+          />
+        </section>
+
+        {/* SPRINT 1.5 SECTION: Structured Reasoning Timeline */}
+        <section>
+          <StructuredReasoningTimeline
+            steps={data.reasoningTimeline}
+            overallReasoning={data.overallReasoning}
+          />
+        </section>
+
+        {/* SPRINT 1.5 SECTION: Investigation Execution Flow Panel */}
+        <section>
+          <InvestigationFlowPanel
+            confidenceTimeline={data.confidenceTimeline}
+          />
+        </section>
+
+        {/* SPRINT 1.5 SECTION: Directed Evidence Relationship Graph (Cytoscape) */}
+        <section>
+          <EvidenceGraphCanvas graphData={data.evidenceGraph} />
+        </section>
+
+        {/* SECTION 2: Provider Health SLA Dashboard */}
         <section>
           <ProviderHealthWidget />
         </section>
 
-        {/* SECTION 2: Summary */}
+        {/* SECTION 3: Shared Investigation Context (Blackboard Panel) */}
+        <section>
+          <SharedBlackboardPanel sharedContext={data.sharedContext} />
+        </section>
+
+        {/* SECTION 4: Coordinator Synthesis & Reasoning */}
+        <section>
+          <CoordinatorReasoningCard
+            verdict={data.verdict || data.finalVerdict || "suspicious"}
+            confidence={data.verdictConfidence}
+            aiReasoning={data.explainability?.reasoning || data.aiSummary}
+            overallReasoning={data.overallReasoning}
+            supportingEvidence={data.supportingEvidence}
+            conflictingEvidence={data.conflictingEvidence}
+            recommendations={data.recommendations}
+          />
+        </section>
+
+        {/* SECTION 5: Summary */}
         <section>
           <SummaryCard data={data} />
         </section>
 
-        {/* SECTION 2.05: Structured Evidence Matrix with Visual Forensics */}
+        {/* SECTION 6: Chronological Evidence Timeline */}
+        <section>
+          <EvidenceTimelineSection evidenceList={data.evidence} />
+        </section>
+
+        {/* SECTION 7: Structured Evidence Matrix with Visual Forensics */}
         <section>
           <StructuredEvidenceMatrixCard summary={data.evidenceSummary} />
         </section>
 
-        {/* SECTION 2.1: Risk Attribution & Insights */}
+        {/* SECTION 8: Risk Attribution & Insights */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <RiskContributionWidget riskScore={data.riskScore} />
           <InvestigationInsightsCard data={data} />
         </section>
 
-        {/* SECTION 2.5: Ask CounterGuard Grounded Assistant */}
+        {/* SECTION 9: Ask CounterGuard Grounded Assistant */}
         <section>
           <AskCounterGuardWidget investigationId={data.id} />
         </section>
 
-        {/* SECTION 3: Verified Recommended Genuine Options */}
+        {/* SECTION 10: Verified Recommended Genuine Options */}
         <section>
           <VerifiedRecommendationsSection products={data.recommendedProducts} />
         </section>
 
-        {/* SECTION 4: Product Comparison Matrix */}
+        {/* SECTION 11: Product Comparison Matrix */}
         <section>
           <ProductComparisonMatrix comparison={data.productComparison} />
         </section>
 
-        {/* SECTION 5: Graph Intelligence Preview */}
+        {/* SECTION 12: Graph Intelligence Preview */}
         <section>
           <GraphIntelligencePreview id={data.id} />
         </section>
 
-        {/* SECTION 6: Consensus & Memory Context */}
+        {/* SECTION 13: Consensus & Memory Context */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ConsensusCard consensus={data.consensus} />
           <MemoryContextCard memory={data.memoryContext} />
         </section>
 
-        {/* SECTION 7: Explainability & Recommendations */}
+        {/* SECTION 13.5: Auditable Case History Timeline */}
         <section>
-          <ExplainabilityAndRecs data={data} />
+          <CaseAuditTimeline
+            events={[
+              { event_id: 'e-1', event_type: 'ACTION', actor: 'System', description: 'Case created & initialized in Investigation Swarm.', timestamp: data.createdAt },
+              { event_id: 'e-2', event_type: 'RECOMMENDATION', actor: 'RecommendationAgent', description: 'Prescriptive Recommendation: Issue Immediate Marketplace Takedown Notice.', timestamp: data.updatedAt },
+              { event_id: 'e-3', event_type: 'ALERT', actor: 'AlertService', description: 'Triggered CRITICAL Price Anomaly Alert (-70% MSRP).', timestamp: data.updatedAt },
+              { event_id: 'e-4', event_type: 'STATE_CHANGE', actor: 'Lead Investigator', description: 'Transitioned state to Investigating.', timestamp: data.updatedAt },
+            ]}
+          />
         </section>
 
-        {/* SECTION 8: Timeline */}
-        <section>
-          <Timeline events={data.timeline} />
-        </section>
-
-        {/* SECTION 9: Evidence Details */}
-        <section>
-          <EvidenceSection items={data.evidence} />
-        </section>
-
-        {/* SECTION 10: Agent Activity Log */}
+        {/* SECTION 14: Agent Telemetry Cards */}
         <section>
           <AgentActivityTable activities={data.agentActivity} />
         </section>
 
-        {/* SECTION 11: Developer Execution Trace & Provider Telemetry */}
+        {/* SECTION 15: Developer Execution Trace & Provider Telemetry */}
         <section>
           <ExecutionTracePanel activities={data.agentActivity} />
         </section>

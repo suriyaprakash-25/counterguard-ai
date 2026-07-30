@@ -3,21 +3,21 @@ import type { GraphData, GraphNode, GraphEdge, GraphStatistics, NodeDetails } fr
 export const GraphMapper = {
   toGraphData(dto: any): GraphData {
     const rawNodes = dto.nodes ?? dto.elements?.nodes ?? [];
-    const rawEdges = dto.edges ?? dto.elements?.edges ?? [];
+    const rawEdges = dto.relationships ?? dto.edges ?? dto.elements?.edges ?? [];
 
     const nodes: GraphNode[] = rawNodes.map((n: any) => ({
       id: n.data?.id ?? n.id,
-      label: n.data?.label ?? n.label,
-      type: n.data?.type ?? n.type ?? 'unknown',
-      riskScore: n.data?.riskScore ?? n.data?.risk ?? n.riskScore ?? 0,
-      properties: n.data?.props ?? {}
+      label: n.data?.name ?? n.name ?? n.data?.label ?? n.label,
+      type: n.data?.type ?? n.type ?? n.label ?? 'unknown',
+      riskScore: n.data?.riskScore ?? n.data?.risk_score ?? n.risk_score ?? n.riskScore ?? 50,
+      properties: n.data?.props ?? n.properties ?? {}
     }));
 
     const edges: GraphEdge[] = rawEdges.map((e: any) => ({
       id: e.data?.id ?? e.id,
       source: e.data?.source ?? e.source,
       target: e.data?.target ?? e.target,
-      label: e.data?.label ?? e.label ?? ''
+      label: e.data?.type ?? e.type ?? e.data?.label ?? e.label ?? ''
     }));
 
     const layout = dto.layout && dto.layout.name ? dto.layout : { name: "cose" };

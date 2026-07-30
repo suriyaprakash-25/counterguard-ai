@@ -28,6 +28,9 @@ import {
 interface CreateInvestigationDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Pre-fill target URL from a discovery candidate */
+  initialUrl?: string;
+  initialTitle?: string;
 }
 
 const TARGET_TYPES = [
@@ -156,7 +159,7 @@ const SWARM_AGENTS = [
   { name: 'MemoryAgent', role: 'Chroma Vector Episode Memory', icon: Sparkles }
 ];
 
-export function CreateInvestigationDialog({ isOpen, onClose }: CreateInvestigationDialogProps) {
+export function CreateInvestigationDialog({ isOpen, onClose, initialUrl, initialTitle }: CreateInvestigationDialogProps) {
   const navigate = useNavigate();
   const { mutate: createInvestigation, isPending } = useCreateInvestigation();
 
@@ -164,7 +167,7 @@ export function CreateInvestigationDialog({ isOpen, onClose }: CreateInvestigati
 
   // Form State
   const [targetType, setTargetType] = useState('Marketplace Product URL');
-  const [targetValue, setTargetValue] = useState('');
+  const [targetValue, setTargetValue] = useState(initialUrl ?? '');
   const [investigationName, setInvestigationName] = useState('');
   const [isNameEdited, setIsNameEdited] = useState(false);
 

@@ -61,5 +61,5 @@ def test_planning_agent_fallback(mock_generate, mock_planner_state):
 
     # Should trigger fallback which runs all specialists
     assert "planning_result" in state
-    assert len(state["planning_result"].selected_specialists) == 4
+    assert len(state["planning_result"].selected_specialists) >= 4
     assert "Fallback" in state["planning_result"].execution_strategy

@@ -1,9 +1,12 @@
 import { NavLink } from "react-router-dom"
-import { LayoutDashboard, Shield, Activity, Settings, Bell, Database } from "lucide-react"
+import { LayoutDashboard, Shield, Activity, Settings, Bell, Database, Sparkles, Network } from "lucide-react"
 
 export function Sidebar() {
   const navItems = [
     { name: "Dashboard", to: "/", icon: <LayoutDashboard className="h-5 w-5" /> },
+    { name: "Product Discovery", to: "/product-intelligence", icon: <Sparkles className="h-5 w-5 text-violet-500" /> },
+    { name: "Continuous Monitoring", to: "/monitoring", icon: <Activity className="h-5 w-5 text-emerald-500" /> },
+    { name: "Fraud Rings", to: "/fraud-rings", icon: <Network className="h-5 w-5 text-red-500" /> },
     { name: "Investigations", to: "/investigations", icon: <Shield className="h-5 w-5" /> },
     { name: "Intelligence", to: "/intelligence", icon: <Database className="h-5 w-5" /> },
     { name: "Alerts", to: "/alerts", icon: <Bell className="h-5 w-5" /> },

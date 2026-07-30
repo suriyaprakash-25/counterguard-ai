@@ -4,8 +4,8 @@ import type { GraphData, GraphStatistics, NodeDetails } from '../models/graph';
 
 export const GraphRepository = {
   async getGraphData(): Promise<GraphData> {
-    const { data } = await apiClient.get(endpoints.graph.data);
-    return GraphMapper.toGraphData(data.data);
+    const { data } = await apiClient.get(endpoints.threatGraph.full);
+    return GraphMapper.toGraphData(data);
   },
 
   async getGraphStats(): Promise<GraphStatistics> {

@@ -1,8 +1,11 @@
+import csv
+import io
 import logging
 import threading
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -93,6 +96,121 @@ def get_investigation_history(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+
+
+@router.get(
+    "/investigations/export",
+    tags=["Investigations"],
+    summary="Export investigations for legal/takedown use (CSV or JSON)",
+)
+def export_investigations(
+    fmt: str = Query(
+        default="csv", alias="format", description="Export format: csv or json"
+    ),
+    service: InvestigationHistoryService = Depends(get_history_service),
+):
+    """
+    GET /api/v1/investigations/export?format=csv|json
+    Export all investigations with risk scores for legal takedown/DMCA reports.
+    """
+    try:
+        response = service.list_investigations(
+            page=1, page_size=500, sort_by="created_at", sort_order="desc"
+        )
+        items = (
+            response.items
+        )  # InvestigationListResponse.items = List[InvestigationHistoryItem]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {e}")
+
+    if fmt == "json":
+        import datetime as _dt
+
+        from fastapi.responses import JSONResponse
+
+        records_dict = [
+            item.model_dump() if hasattr(item, "model_dump") else item.dict()
+            for item in items
+        ]
+        return JSONResponse(
+            content={
+                "investigations": records_dict,
+                "total": len(records_dict),
+                "exported_at": _dt.datetime.utcnow().isoformat(),
+            },
+            headers={
+                "Content-Disposition": "attachment; filename=CounterGuard_Investigations.json"
+            },
+        )
+
+    # Default: CSV export
+    fieldnames = [
+        "investigation_id",
+        "listing_url",
+        "marketplace",
+        "product",
+        "display_title",
+        "status",
+        "risk_score",
+        "risk_level",
+        "created_at",
+        "updated_at",
+    ]
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for inv in items:
+        writer.writerow(
+            {
+                "investigation_id": getattr(inv, "id", ""),
+                "listing_url": getattr(inv, "listing_url", ""),
+                "marketplace": getattr(inv, "marketplace", ""),
+                "product": getattr(inv, "product", ""),
+                "display_title": getattr(inv, "display_title", ""),
+                "status": getattr(inv, "status", ""),
+                "risk_score": getattr(inv, "risk_score", ""),
+                "risk_level": getattr(inv, "risk_level", ""),
+                "created_at": str(getattr(inv, "created_at", "")),
+                "updated_at": str(getattr(inv, "updated_at", "")),
+            }
+        )
+
+    csv_content = output.getvalue()
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=CounterGuard_Investigations_Export.csv"
+        },
+    )
+
+
+@router.get(
+    "/investigations/{id}/timeline",
+    tags=["Investigations"],
+    summary="Get chronological execution timeline for an investigation",
+)
+def get_investigation_timeline_api(id: str):
+    """
+    GET /api/v1/investigations/{id}/timeline — Feature 6 & 13: Detailed execution timeline with stage durations.
+    """
+    from backend.services.evidence_lineage_service import evidence_lineage_service
+
+    return evidence_lineage_service.get_investigation_timeline(id)
+
+
+@router.get(
+    "/investigations/{id}/lineage",
+    tags=["Investigations"],
+    summary="Get complete Evidence Lineage Graph DAG for an investigation",
+)
+def get_investigation_lineage_api(id: str):
+    """
+    GET /api/v1/investigations/{id}/lineage — Feature 5 & 13: DAG graph of evidence lineage (HTTP -> HTML -> Parser -> Candidate -> Group -> Inv -> Report).
+    """
+    from backend.services.evidence_lineage_service import evidence_lineage_service
+
+    return evidence_lineage_service.get_investigation_lineage(id)
 
 
 @router.get(

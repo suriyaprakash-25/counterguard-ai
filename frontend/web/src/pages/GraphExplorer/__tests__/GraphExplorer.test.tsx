@@ -4,11 +4,12 @@ import { BrowserRouter } from "react-router-dom";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import GraphExplorer from "../index";
 
-vi.mock("../services/graph.service", () => ({
-  graphService: {
+vi.mock("../services/graph.repository", () => ({
+  GraphRepository: {
     getGraphData: vi.fn().mockResolvedValue({
-      nodes: Array(8).fill({}),
-      edges: Array(7).fill({})
+      nodes: Array(8).fill({ id: 'n1', label: 'Node', type: 'Node' }),
+      edges: Array(7).fill({ id: 'e1', source: 'n1', target: 'n2', label: 'rel' }),
+      layout: { name: 'cose' }
     }),
     getGraphStats: vi.fn().mockResolvedValue({}),
     getNodeDetails: vi.fn().mockResolvedValue({})
@@ -47,7 +48,7 @@ describe("Graph Explorer Page", () => {
 
   it("renders header and toolbar", () => {
     renderPage();
-    expect(screen.getByText("Knowledge Graph Explorer")).toBeInTheDocument();
+    expect(screen.getByText(/Threat Knowledge Graph Explorer/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Search nodes/)).toBeInTheDocument();
   });
 

@@ -8,7 +8,10 @@ const Dashboard = lazy(() => import("../pages/Dashboard"))
 const Investigations = lazy(() => import("../pages/Investigations"))
 const InvestigationDetails = lazy(() => import("../pages/InvestigationDetails"))
 const Intelligence = lazy(() => import("../pages/Intelligence"))
+const ProductIntelligence = lazy(() => import("../pages/ProductIntelligence"))
+const Monitoring = lazy(() => import("../pages/Monitoring"))
 const GraphExplorer = lazy(() => import("../pages/GraphExplorer"))
+const FraudRings = lazy(() => import("../pages/FraudRings"))
 const Alerts = lazy(() => import("../pages/Alerts"))
 const Analytics = lazy(() => import("../pages/Analytics"))
 const Settings = lazy(() => import("../pages/Settings"))
@@ -43,7 +46,12 @@ export const router = createBrowserRouter([
       { path: "investigations", element: <SuspenseWrapper><Investigations /></SuspenseWrapper> },
       { path: "investigations/:id", element: <SuspenseWrapper><InvestigationDetails /></SuspenseWrapper> },
       { path: "intelligence", element: <SuspenseWrapper><Intelligence /></SuspenseWrapper> },
+      { path: "product-intelligence", element: <SuspenseWrapper><ProductIntelligence /></SuspenseWrapper> },
+      { path: "monitoring", element: <SuspenseWrapper><Monitoring /></SuspenseWrapper> },
+      { path: "continuous-monitoring", element: <SuspenseWrapper><Monitoring /></SuspenseWrapper> },
       { path: "graph", element: <SuspenseWrapper><GraphExplorer /></SuspenseWrapper> },
+      { path: "fraud-rings", element: <SuspenseWrapper><FraudRings /></SuspenseWrapper> },
+      { path: "threat/rings", element: <SuspenseWrapper><FraudRings /></SuspenseWrapper> },
       { path: "alerts", element: <SuspenseWrapper><Alerts /></SuspenseWrapper> },
       { path: "analytics", element: <SuspenseWrapper><Analytics /></SuspenseWrapper> },
       { path: "settings", element: <SuspenseWrapper><Settings /></SuspenseWrapper> },

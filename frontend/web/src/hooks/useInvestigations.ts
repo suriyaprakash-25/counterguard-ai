@@ -64,6 +64,22 @@ export const useInvestigationReport = (id: string) => {
   });
 };
 
+export const useInvestigationEvidence = (id: string) => {
+  return useQuery({
+    queryKey: ['investigations', 'evidence', id],
+    queryFn: () => InvestigationRepository.getEvidence(id),
+    enabled: !!id
+  });
+};
+
+export const useInvestigationContext = (id: string) => {
+  return useQuery({
+    queryKey: ['investigations', 'context', id],
+    queryFn: () => InvestigationRepository.getContext(id),
+    enabled: !!id
+  });
+};
+
 // Mutations
 export const useCreateInvestigation = () => {
   const queryClient = useQueryClient();

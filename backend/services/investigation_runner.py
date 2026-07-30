@@ -134,7 +134,30 @@ class InvestigationRunner:
             investigation.status = "completed"
             db_session.commit()
             logger.info(f"[Runner] Investigation {investigation_id} → COMPLETED")
-            # FUTURE WEBSOCKET: publish("InvestigationCompleted", investigation_id)
+
+            # --- 6. Enrich Threat Knowledge Graph ---
+            try:
+                from backend.services.threat_graph_service import threat_graph_service
+
+                threat_graph_service.ingest_investigation(
+                    {
+                        "investigation_id": investigation_id,
+                        "title": request_dto.url
+                        or request_dto.raw_text
+                        or "Discovered Listing",
+                        "seller": getattr(request_dto, "seller", "Discovered Seller"),
+                        "marketplace": getattr(
+                            request_dto, "marketplace", "E-Commerce Platform"
+                        ),
+                        "risk_score": report.risk_score,
+                        "verdict": report.risk_level,
+                    }
+                )
+                logger.info(
+                    f"[Runner] Enriched Threat Knowledge Graph for {investigation_id}"
+                )
+            except Exception as graph_err:
+                logger.warning(f"[Runner] Could not enrich threat graph: {graph_err}")
 
         except Exception as e:
             # --- 6. IN_PROGRESS → FAILED ---

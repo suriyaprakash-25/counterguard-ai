@@ -22,27 +22,64 @@ def merge_context(
     if not b:
         return a
 
-    # Create a new instance to avoid mutating the original
     merged = a.model_copy()
 
-    # Safely merge lists avoiding duplicates by ID if possible, otherwise extend
-    merged.shared_evidence.extend(
-        [e for e in b.shared_evidence if e not in a.shared_evidence]
-    )
-    merged.shared_observations.extend(
-        [o for o in b.shared_observations if o not in a.shared_observations]
-    )
+    if b.product_info:
+        merged.product_info = {**a.product_info, **b.product_info}
+    if b.seller_info:
+        merged.seller_info = {**a.seller_info, **b.seller_info}
+    if b.extracted_metadata:
+        merged.extracted_metadata = {**a.extracted_metadata, **b.extracted_metadata}
+    if b.marketplace and b.marketplace != "Global":
+        merged.marketplace = b.marketplace
+
+    existing_evidence_ids = {e.evidence_id for e in a.shared_evidence}
+    for e in b.shared_evidence:
+        if e.evidence_id not in existing_evidence_ids:
+            merged.shared_evidence.append(e)
+            existing_evidence_ids.add(e.evidence_id)
+
+    existing_obs_ids = {o.id for o in a.shared_observations}
+    for o in b.shared_observations:
+        if o.id not in existing_obs_ids:
+            merged.shared_observations.append(o)
+            existing_obs_ids.add(o.id)
+
     merged.unresolved_questions.extend(
         [q for q in b.unresolved_questions if q not in a.unresolved_questions]
     )
     merged.tasks.extend([t for t in b.tasks if t not in a.tasks])
-    merged.confidence_timeline.extend(b.confidence_timeline)
 
-    # Merge GraphRAG Intelligence
+    def _get_step_key(s):
+        ag = getattr(
+            s,
+            "agent",
+            getattr(
+                s, "agent_name", s.get("agent_name") if isinstance(s, dict) else ""
+            ),
+        )
+        rs = getattr(
+            s,
+            "reason",
+            getattr(s, "reasoning", s.get("reasoning") if isinstance(s, dict) else ""),
+        )
+        return (ag, rs)
+
+    existing_steps = {_get_step_key(s) for s in a.confidence_timeline}
+    for step in b.confidence_timeline:
+        key = _get_step_key(step)
+        if key not in existing_steps:
+            merged.confidence_timeline.append(step)
+            existing_steps.add(key)
+
+    merged.recalculate_intermediate_risk()
+
     if b.graphrag_intelligence:
         merged.graphrag_intelligence = b.graphrag_intelligence
     if b.graphrag_context:
         merged.graphrag_context = b.graphrag_context
+    if b.final_verdict:
+        merged.final_verdict = b.final_verdict
 
     return merged
 

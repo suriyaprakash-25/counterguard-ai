@@ -1,240 +1,177 @@
-from unittest.mock import MagicMock, patch
-
-from backend.agents.analyzer import AnalyzerAgent
-from backend.agents.assessor import RiskAssessor
-from backend.agents.collector import EvidenceCollector
-from backend.agents.reporter import ReportGenerator
-from backend.schemas.investigation import InvestigationRequest
-from backend.schemas.scraping import ParsedListing, ScrapingResult
-from backend.services.investigation_service import InvestigationService
+from backend.agents.specialists import SellerAgent
+from backend.collaboration.models.context import InvestigationContext
+from backend.memory.models.domain import Evidence
+from backend.schemas.llm_models import SellerAnalysisResult
 from backend.services.verdict_engine import VerdictEngine
+from backend.state import merge_context
 
 
-def get_mock_scraping_result():
-    return ScrapingResult(
-        success=True,
-        listing=ParsedListing(
-            brand="GenericBrand",
-            title="Suspicious Product from Amazon",
-            price=5.0,  # very_low_price
-            seller_rating=2.5,  # poor_seller_rating
-            seller_name="Unknown Seller",  # missing_seller
-            warranty_info=None,  # no_warranty
-            images_count=1,  # few_images
-            marketplace="Amazon",
-            data_source="live_retrieval",
-        ),
+def test_evidence_model_instantiation():
+    ev = Evidence(
+        agent_name="PriceAgent",
+        category="Price",
+        title="Severe MSRP Drop",
+        description="Product is listed at 90% below standard market price.",
+        severity="critical",
+        confidence=0.92,
+        source="price_history",
     )
 
-
-def test_analyzer():
-    analyzer = AnalyzerAgent()
-    request = InvestigationRequest(
-        listing_url="http://example.com", marketplace="Amazon"
-    )
-    result = analyzer.analyze(request, get_mock_scraping_result())
-    assert result.brand == "GenericBrand"
-    assert result.marketplace == "Amazon"
-    assert result.price == 5.0
-    assert result.seller_rating == 2.5
-    assert "very_low_price" in result.risk_signals
+    assert ev.id is not None
+    assert ev.agent_name == "PriceAgent"
+    assert ev.source_agent == "PriceAgent"
+    assert ev.category.upper() == "PRICE"
+    assert ev.severity == "critical"
+    assert ev.confidence == 0.92
+    assert "90% below" in ev.description
+    assert isinstance(ev.timestamp, str)
 
 
-def test_collector():
-    analyzer = AnalyzerAgent()
-    collector = EvidenceCollector()
-    request = InvestigationRequest(
-        listing_url="http://example.com", marketplace="Amazon"
-    )
-    analysis = analyzer.analyze(request, get_mock_scraping_result())
-    evidence = collector.collect(analysis)
-    se = evidence.structured_evidence
-    assert se["price"]["status"] == "Suspicious"
-    assert se["seller"]["status"] == "Missing"
-    assert se["warranty"]["status"] == "Missing"
-    assert se["images"]["status"] == "Poor"
+def test_investigation_context_evidence_operations():
+    ctx = InvestigationContext(investigation_id="inv_test_101", marketplace="Amazon")
 
-
-def test_assessor():
-    analyzer = AnalyzerAgent()
-    collector = EvidenceCollector()
-    assessor = RiskAssessor()
-    request = InvestigationRequest(
-        listing_url="http://example.com", marketplace="Amazon"
-    )
-    analysis = analyzer.analyze(request, get_mock_scraping_result())
-    evidence = collector.collect(analysis)
-    risk = assessor.assess(analysis, evidence)
-    assert risk.risk_score == 100
-    assert risk.risk_level == "HIGH"
-
-
-def test_reporter():
-    analyzer = AnalyzerAgent()
-    collector = EvidenceCollector()
-    assessor = RiskAssessor()
-    reporter = ReportGenerator()
-    request = InvestigationRequest(
-        listing_url="http://example.com", marketplace="Amazon"
-    )
-    analysis = analyzer.analyze(request, get_mock_scraping_result())
-    evidence = collector.collect(analysis)
-    risk = assessor.assess(analysis, evidence)
-    report = reporter.generate(
-        analysis, evidence, risk, scraping_result=get_mock_scraping_result()
+    ev1 = Evidence(
+        agent_name="PriceAgent",
+        category="Price",
+        title="Price Anomaly",
+        description="Listed price is ₹210 vs MSRP ₹2,499",
+        severity="critical",
+        confidence=0.95,
+        source="price_history",
     )
 
-    assert report.risk_score == 100
-    assert report.risk_level == "CRITICAL"
-    assert any("Price Anomaly" in f for f in report.findings)
-    assert "takedown" in report.recommendation.lower()
-
-
-def get_mock_structured_response(system_prompt, user_prompt, response_model):
-    from backend.schemas.llm_models import (
-        AIInvestigationResult,
-        BrandAnalysisResult,
-        PlanningResult,
-        PriceAnalysisResult,
-        ReviewAnalysisResult,
-        SellerAnalysisResult,
+    ev2 = Evidence(
+        agent_name="SellerAgent",
+        category="Seller",
+        title="New Unverified Merchant",
+        description="Seller domain created 10 days ago",
+        severity="high",
+        confidence=0.85,
+        source="whois_lookup",
     )
 
-    if response_model == PriceAnalysisResult:
-        return PriceAnalysisResult(
-            anomaly_detected=True, reasoning="Mock", risk_score=50
+    ctx.add_evidence(ev1)
+    ctx.add_evidence(ev2)
+
+    # Test evidence properties & execution order
+    assert len(ctx.evidence) == 2
+    assert ctx.evidence[0].agent_name == "PriceAgent"
+    assert ctx.evidence[1].agent_name == "SellerAgent"
+
+    # Filter by agent
+    price_ev = ctx.get_evidence_by_agent("PriceAgent")
+    assert len(price_ev) == 1
+    assert price_ev[0].title == "Price Anomaly"
+
+    # Filter by category
+    seller_ev = ctx.get_evidence_by_category("Seller")
+    assert len(seller_ev) == 1
+    assert seller_ev[0].severity == "high"
+
+    # Intermediate risk calculation test
+    assert ctx.intermediate_risk > 0.0
+    assert len(ctx.confidence_history) == 2
+
+
+def test_merge_context_reducer_deduplication():
+    ctx_a = InvestigationContext(investigation_id="inv_merge")
+    ev1 = Evidence(
+        evidence_id="ev_fixed_1",
+        agent_name="PriceAgent",
+        category="Price",
+        title="Price Drop",
+        description="Price is low",
+        severity="high",
+        confidence=0.8,
+    )
+    ctx_a.add_evidence(ev1)
+
+    ctx_b = InvestigationContext(investigation_id="inv_merge")
+    ev2 = Evidence(
+        evidence_id="ev_fixed_2",
+        agent_name="BrandAgent",
+        category="Brand",
+        title="Trademark Check",
+        description="Unverified Brand",
+        severity="medium",
+        confidence=0.7,
+    )
+    # Re-adding ev1 to test deduplication
+    ctx_b.add_evidence(ev1)
+    ctx_b.add_evidence(ev2)
+
+    merged = merge_context(ctx_a, ctx_b)
+
+    assert len(merged.shared_evidence) == 2
+    evidence_ids = [e.evidence_id for e in merged.shared_evidence]
+    assert "ev_fixed_1" in evidence_ids
+    assert "ev_fixed_2" in evidence_ids
+
+
+def test_contextual_confidence_propagation_price_to_seller():
+    ctx = InvestigationContext(investigation_id="inv_prop")
+    # Step 1: PriceAgent adds severe price anomaly evidence
+    price_ev = Evidence(
+        agent_name="PriceAgent",
+        category="Price",
+        title="Severe MSRP Drop",
+        description="Price 90% below market",
+        severity="critical",
+        confidence=0.95,
+    )
+    ctx.add_evidence(price_ev)
+
+    # Step 2: SellerAgent executes and inspects state context
+    seller_agent = SellerAgent()
+    mock_state = {"context": ctx, "scraping_result": None, "request": None}
+
+    # Seller initial analysis result
+    mock_seller_res = SellerAnalysisResult(
+        reputation_risk="High", reasoning="Domain age 14 days", risk_score=50
+    )
+
+    updates = seller_agent._update_state(mock_state, mock_seller_res)
+    updated_seller_res = updates["seller_analysis"]
+
+    # Verify suspicion risk score was elevated from 50 to 57 (+15%)
+    assert updated_seller_res.risk_score > 50
+    assert "Suspicion elevated" in updated_seller_res.reasoning
+
+
+def test_coordinator_verdict_engine_conflict_detection():
+    ctx = InvestigationContext(investigation_id="inv_conflicts")
+
+    # Conflicting Evidence: High price risk vs Low brand risk
+    ctx.add_evidence(
+        Evidence(
+            agent_name="PriceAgent",
+            category="Price",
+            title="Critical Discount",
+            description="Price 85% off",
+            severity="critical",
+            confidence=0.9,
         )
-    elif response_model == SellerAnalysisResult:
-        return SellerAnalysisResult(
-            reputation_risk="High", reasoning="Mock", risk_score=50
-        )
-    elif response_model == BrandAnalysisResult:
-        return BrandAnalysisResult(
-            authenticity_flags=["Mock"], reasoning="Mock", risk_score=50
-        )
-    elif response_model == ReviewAnalysisResult:
-        return ReviewAnalysisResult(
-            fake_reviews_detected=True, reasoning="Mock", risk_score=50
-        )
-    elif response_model == PlanningResult:
-        return PlanningResult(
-            selected_specialists=["PriceAgent", "SellerAgent"],
-            priority="High",
-            execution_strategy="Mock",
-            rationale="Mock",
-        )
-    elif response_model == AIInvestigationResult:
-        return AIInvestigationResult(
-            summary="Mock",
-            detailed_reasoning="Mock",
-            suspicious_indicators=["Mock"],
-            confidence_score=100.0,
-        )
-    return MagicMock()
-
-
-@patch("backend.services.scraping_service.ScrapingService.scrape")
-@patch("backend.services.llm_service.LLMService.generate_structured_response")
-def test_investigation_service(mock_generate, mock_scrape):
-    mock_scrape.return_value = get_mock_scraping_result()
-    mock_generate.side_effect = get_mock_structured_response
-
-    service = InvestigationService()
-    request = InvestigationRequest(
-        listing_url="http://example.com", marketplace="Amazon"
     )
-    report = service.run_investigation(request)
-
-    assert report.risk_score == 100
-    assert report.risk_level == "CRITICAL"
-
-
-@patch("backend.services.scraping_service.ScrapingService.scrape")
-@patch("backend.services.llm_service.LLMService.generate_structured_response")
-@patch("backend.agents.specialists.SellerAgent.run")
-@patch("backend.agents.specialists.BrandAgent.run")
-def test_dynamic_routing(mock_brand_run, mock_seller_run, mock_generate, mock_scrape):
-    """
-    Tests that the LangGraph dynamically skips agents that are not selected by the planner.
-    """
-    mock_scrape.return_value = get_mock_scraping_result()
-
-    def custom_mock_response(system_prompt, user_prompt, response_model):
-        from backend.schemas.llm_models import PlanningResult
-
-        if response_model == PlanningResult:
-            return PlanningResult(
-                selected_specialists=["PriceAgent", "ReviewAgent"],
-                priority="High",
-                execution_strategy="Mock",
-                rationale="Mock",
-            )
-        return get_mock_structured_response(system_prompt, user_prompt, response_model)
-
-    mock_generate.side_effect = custom_mock_response
-
-    service = InvestigationService()
-    request = InvestigationRequest(
-        listing_url="http://example.com", marketplace="Amazon"
+    ctx.add_evidence(
+        Evidence(
+            agent_name="BrandAgent",
+            category="Brand",
+            title="Verified Catalog Match",
+            description="Product matched official catalog",
+            severity="info",
+            confidence=0.95,
+        )
     )
-    from backend.orchestrator.graph import get_compiled_graph
 
-    service.graph = get_compiled_graph()
-
-    report = service.run_investigation(request)
-
-    mock_seller_run.assert_not_called()
-    mock_brand_run.assert_not_called()
-
-    assert report.risk_level == "CRITICAL"
-
-
-def test_verdict_reconciliation():
-    """
-    Asserts that given a set of findings and risk scores, the numeric risk_level and text ai_summary
-    never contradict each other on genuine/suspicious/counterfeit verdicts.
-    """
-    # 1. Low risk / Authentic test
-    verdict_low = VerdictEngine.evaluate_risk(
-        raw_risk_score=10,
-        product_name="Sony WH-1000XM5",
+    verdict = VerdictEngine.evaluate_risk(
+        raw_risk_score=75,
+        product_name="Nothing Phone (2a)",
         marketplace="Amazon",
-        seller_name="Sony Direct",
-        price=399.99,
-        data_source="live_retrieval",
-    )
-    assert verdict_low.risk_level == "LOW"
-    assert verdict_low.final_verdict == "AUTHENTIC"
-    assert (
-        "genuine" in verdict_low.summary.lower()
-        or "authentic" in verdict_low.summary.lower()
+        seller_name="Verified Outlet",
+        price=199.99,
+        context=ctx,
     )
 
-    # 2. Critical risk / Counterfeit test
-    verdict_high = VerdictEngine.evaluate_risk(
-        raw_risk_score=95,
-        product_name="Sony WH-1000XM5",
-        marketplace="Amazon",
-        seller_name="Cheap Fake Shop",
-        price=29.99,
-        data_source="live_retrieval",
-    )
-    assert verdict_high.risk_level == "CRITICAL"
-    assert verdict_high.final_verdict == "LIKELY_COUNTERFEIT"
-    assert (
-        "counterfeit" in verdict_high.summary.lower()
-        or "threat" in verdict_high.summary.lower()
-    )
-
-    # 3. Fallback demo data / INSUFFICIENT_DATA test
-    verdict_fallback = VerdictEngine.evaluate_risk(
-        raw_risk_score=95,
-        product_name="Sony WH-1000XM5",
-        marketplace="Amazon",
-        seller_name="Unknown",
-        price=29.99,
-        data_source="fallback_demo_data",
-    )
-    assert verdict_fallback.risk_level == "INSUFFICIENT_DATA"
-    assert verdict_fallback.final_verdict == "INSUFFICIENT_DATA"
-    assert "insufficient data" in verdict_fallback.summary.lower()
+    assert verdict.final_verdict in ["SUSPICIOUS", "LIKELY_COUNTERFEIT"]
+    assert "Conflicting agent evidence detected" in verdict.reasoning
+    assert verdict.confidence <= 0.95

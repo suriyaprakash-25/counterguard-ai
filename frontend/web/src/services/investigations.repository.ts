@@ -51,5 +51,15 @@ export const InvestigationRepository = {
   async getReport(id: string): Promise<any> {
     const { data } = await apiClient.get(endpoints.investigations.report(id));
     return data.data;
+  },
+
+  async getEvidence(id: string): Promise<any> {
+    const { data } = await apiClient.get(endpoints.investigations.evidence(id));
+    return data.data;
+  },
+
+  async getContext(id: string): Promise<any> {
+    const { data } = await apiClient.get(endpoints.investigations.consensus(id));
+    return data.data;
   }
 };

@@ -28,8 +28,8 @@ describe("Intelligence Center Page", () => {
 
   it("renders page header and search", () => {
     renderPage();
-    expect(screen.getByText("Intelligence Center")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Search for Seller/)).toBeInTheDocument();
+    expect(screen.getByText(/Threat Intelligence/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Search Threat Intelligence/i)).toBeInTheDocument();
   });
 
   it("renders global summary widget", async () => {

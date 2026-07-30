@@ -49,3 +49,15 @@ class InvestigationReport(BaseModel):
     investigation_timestamp: str
     recommended_products: List[Dict[str, Any]] = Field(default_factory=list)
     data_confidence_warning: Optional[str] = None
+
+    # Sprint 1 Evidence-Driven Reasoning Fields
+    overall_confidence: float = Field(0.85, ge=0.0, le=1.0)
+    overall_reasoning: List[str] = Field(default_factory=list)
+    supporting_evidence: List[Dict[str, Any]] = Field(default_factory=list)
+    conflicting_evidence: List[Dict[str, Any]] = Field(default_factory=list)
+    recommended_actions: List[Dict[str, Any]] = Field(default_factory=list)
+
+    # Sprint 1.5 Directed Graph & Progression Fields
+    confidence_timeline: List[Dict[str, Any]] = Field(default_factory=list)
+    reasoning_timeline: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_graph: Dict[str, Any] = Field(default_factory=dict)

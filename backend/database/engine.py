@@ -42,6 +42,10 @@ def get_engine(db_url: Optional[str] = None, **kwargs) -> Engine:
         if is_sqlite:
             event.listen(_engine, "connect", _set_sqlite_pragma)
 
+        from backend.models.base import Base
+
+        Base.metadata.create_all(bind=_engine)
+
     return _engine
 
 

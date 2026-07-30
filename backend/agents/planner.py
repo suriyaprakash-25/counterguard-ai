@@ -41,19 +41,94 @@ class PlanningAgent:
                 response_model=PlanningResult,
             )
             logger.info(f"Planned Specialists: {result.selected_specialists}")
-            return {"planning_result": result}
+
+            # Initialize InvestigationContext Blackboard
+            listing_obj = (
+                state.get("scraping_result").listing
+                if state.get("scraping_result")
+                else None
+            )
+            product_info = {
+                "title": listing_obj.title if listing_obj else "Unknown Product",
+                "price": listing_obj.price if listing_obj else 0.0,
+                "brand": listing_obj.brand if listing_obj else "",
+                "image_url": listing_obj.image_url if listing_obj else "",
+            }
+            marketplace = (
+                listing_obj.marketplace
+                if listing_obj
+                and hasattr(listing_obj, "marketplace")
+                and listing_obj.marketplace
+                else "Global"
+            )
+            seller_info = {
+                "name": listing_obj.seller_name if listing_obj else "Unknown Seller"
+            }
+
+            from backend.collaboration.models.context import InvestigationContext
+            from backend.collaboration.models.protocol import AgentObservation
+            from backend.memory.models.domain import Evidence
+
+            new_context = InvestigationContext(
+                product_info=product_info,
+                marketplace=marketplace,
+                seller_info=seller_info,
+                extracted_metadata=listing_data.get("metadata", {}),
+            )
+            plan_ev = Evidence(
+                agent_name="PlanningAgent",
+                source_agent="PlanningAgent",
+                category="Strategy",
+                title="Target Strategy Plan",
+                description=f"Selected specialists: {', '.join(result.selected_specialists)}. Priority: {result.priority}",
+                severity="info",
+                confidence=0.95,
+                source="investigation_planner",
+                metadata={
+                    "priority": result.priority,
+                    "specialists": result.selected_specialists,
+                },
+            )
+            new_context.add_evidence(plan_ev)
+            new_context.add_observation(
+                AgentObservation(
+                    source_agent="PlanningAgent",
+                    content=f"Strategy: {result.execution_strategy}. Rationale: {result.rationale}",
+                )
+            )
+
+            return {"planning_result": result, "context": new_context}
         except LLMServiceError as e:
             logger.error(f"PlanningAgent failed: {e}")
-            # Fallback plan: run all specialists to be safe
             fallback = PlanningResult(
                 selected_specialists=[
                     "PriceAgent",
                     "SellerAgent",
                     "BrandAgent",
                     "ReviewAgent",
+                    "BrandIntelligenceAgent",
+                    "SpecificationValidationAgent",
+                    "AuthorizedSellerAgent",
+                    "MetadataIntelligenceAgent",
                 ],
                 priority="High",
                 execution_strategy="Fallback plan: executing all specialists due to LLM error.",
                 rationale="Planner service was unavailable.",
             )
-            return {"planning_result": fallback}
+
+            from backend.collaboration.models.context import InvestigationContext
+            from backend.memory.models.domain import Evidence
+
+            new_context = InvestigationContext()
+            plan_ev = Evidence(
+                agent_name="PlanningAgent",
+                source_agent="PlanningAgent",
+                category="Strategy",
+                title="Fallback Strategy Plan",
+                description="Executing all specialists due to service unavailability.",
+                severity="medium",
+                confidence=0.5,
+                source="investigation_planner",
+            )
+            new_context.add_evidence(plan_ev)
+            return {"planning_result": fallback, "context": new_context}

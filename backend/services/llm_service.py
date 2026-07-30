@@ -131,7 +131,57 @@ class LLMService:
                 risk_score=65 if is_low else 15,
             )
 
-        if "seller" in response_model.__name__.lower():
+        if response_model.__name__ == "BrandIntelligenceResult":
+            from backend.schemas.intelligence import BrandIntelligenceResult
+
+            return BrandIntelligenceResult(
+                official_brand="Unverified Brand",
+                manufacturer="Unknown",
+                product_family="General",
+                catalog_match=False,
+                suspicious_branding_flags=[],
+                risk_score=40,
+                reasoning="Automated rule fallback: brand intelligence evaluated catalog and trademark data.",
+            )
+
+        if response_model.__name__ == "SpecificationValidationResult":
+            from backend.schemas.intelligence import SpecificationValidationResult
+
+            return SpecificationValidationResult(
+                missing_specs=[],
+                impossible_specs=[],
+                inconsistent_specs=[],
+                validated_specs={},
+                risk_score=30,
+                reasoning="Automated rule fallback: specification validation complete.",
+            )
+
+        if response_model.__name__ == "AuthorizedSellerResult":
+            from backend.schemas.intelligence import AuthorizedSellerResult
+
+            is_official = "official" in prompt_lower or "authorized" in prompt_lower
+            return AuthorizedSellerResult(
+                seller_type="official_seller" if is_official else "unknown_seller",
+                is_official=is_official,
+                confidence_boost=0.25 if is_official else 0.0,
+                risk_score=15 if is_official else 50,
+                reasoning="Automated rule fallback: seller authorization evaluated.",
+            )
+
+        if response_model.__name__ == "MetadataIntelligenceResult":
+            from backend.schemas.intelligence import MetadataIntelligenceResult
+
+            return MetadataIntelligenceResult(
+                keyword_stuffing_detected=False,
+                spam_score=20,
+                grammar_anomaly_score=10,
+                duplicate_wording_detected=False,
+                image_metadata_flags=[],
+                risk_score=25,
+                reasoning="Automated rule fallback: metadata analysis complete.",
+            )
+
+        if response_model.__name__ == "SellerAnalysisResult":
             from backend.schemas.llm_models import SellerAnalysisResult
 
             is_poor = (
@@ -145,7 +195,7 @@ class LLMService:
                 risk_score=75 if is_poor else 15,
             )
 
-        if "brand" in response_model.__name__.lower():
+        if response_model.__name__ == "BrandAnalysisResult":
             from backend.schemas.llm_models import BrandAnalysisResult
 
             is_replica = (

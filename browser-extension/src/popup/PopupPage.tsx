@@ -21,6 +21,8 @@ import { useActiveTab } from "../hooks/useActiveTab";
 import { BackendApiClient } from "../api/client";
 import { BackendHealthStatus, SecurityAnalysisResult } from "../types/extension";
 import { ChromeStorageService } from "../services/storage.service";
+import { DomExtractionEngine } from "../parsers";
+
 
 export function PopupPage() {
   const { settings } = useChromeStorage();
@@ -56,41 +58,36 @@ export function PopupPage() {
     setErrorMsg(null);
 
     try {
-      const searchResp = await BackendApiClient.searchCandidates(
-        settings.backendUrl,
-        page.title || page.domain
+      // 1. Extract ProductCard DOM details
+      const extractedCard = DomExtractionEngine.extract(
+        document,
+        page.marketplaceName || page.domain,
+        page.url
       );
 
-      const matchedCount = searchResp ? searchResp.total_discovered : 0;
-      const isHighRisk = matchedCount > 2;
+      // 2. Send ExtractedProductCard to FastAPI POST /api/v1/browser/analyze
+      const backendResp = await BackendApiClient.analyzeProductCard(
+        settings.backendUrl,
+        extractedCard
+      );
 
       const result: SecurityAnalysisResult = {
         marketplace: page.marketplaceName || page.domain,
-        threatLevel: isHighRisk ? "HIGH" : matchedCount > 0 ? "MEDIUM" : "SAFE",
-        threatScore: isHighRisk ? 84 : matchedCount > 0 ? 45 : 12,
-        verdict: isHighRisk
+        threatLevel: backendResp.threat_level,
+        threatScore: backendResp.risk_score,
+        sellerTrust: backendResp.seller_trust,
+        recommendation: backendResp.recommendation,
+        investigationId: backendResp.investigation_id,
+        evidenceId: backendResp.evidence_id,
+        verdict: backendResp.threat_level === "CRITICAL" || backendResp.threat_level === "HIGH"
           ? "SUSPICIOUS COUNTERFEIT RISK"
-          : matchedCount > 0
-          ? "UNVERIFIED BRAND LISTINGS"
-          : "CLEAN AUTHENTIC DOMAIN",
-        matchedListingsCount: matchedCount,
-        confidenceScore: searchResp ? 96.0 : 90.0,
+          : backendResp.threat_level === "MEDIUM"
+          ? "UNVERIFIED SELLER LISTING"
+          : "CLEAN AUTHENTIC LISTING",
+        matchedListingsCount: 1,
+        confidenceScore: extractedCard.confidenceScore,
         analyzedAt: new Date().toLocaleTimeString(),
-        findings: isHighRisk
-          ? [
-              `Discovered ${matchedCount} unauthorized candidate listings across marketplaces`,
-              "Price variance > 40% below brand MSRP threshold",
-              "Seller network matched high risk pattern in graph database",
-            ]
-          : matchedCount > 0
-          ? [
-              `Found ${matchedCount} listings matching domain search query`,
-              "Brand seller domain verification pending",
-            ]
-          : [
-              "No counterfeit risk detected across 6 monitored marketplaces",
-              "Domain SSL and seller credentials verified",
-            ],
+        findings: backendResp.findings,
       };
 
       setAnalysis(result);
@@ -103,6 +100,7 @@ export function PopupPage() {
       setAnalyzing(false);
     }
   };
+
 
   const handleOpenSettings = () => {
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.openOptionsPage) {
@@ -292,14 +290,38 @@ export function PopupPage() {
 
             <div className="grid grid-cols-2 gap-2 text-[10px] font-mono bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-slate-300">
               <div>
-                <span className="text-slate-500 block text-[9px]">Matched Listings</span>
-                <strong className="text-white text-xs">{analysis.matchedListingsCount}</strong>
+                <span className="text-slate-500 block text-[9px]">Seller Trust</span>
+                <strong className={analysis.sellerTrust && analysis.sellerTrust >= 70 ? "text-emerald-400 text-xs" : "text-amber-400 text-xs"}>
+                  {analysis.sellerTrust ?? 50}%
+                </strong>
               </div>
               <div>
                 <span className="text-slate-500 block text-[9px]">Confidence</span>
                 <strong className="text-emerald-400 text-xs">{analysis.confidenceScore}%</strong>
               </div>
             </div>
+
+            {analysis.recommendation && (
+              <div className="p-2 rounded bg-purple-950/40 border border-purple-800/60 text-[10px] font-mono text-purple-200">
+                <span className="font-bold block text-[9px] text-purple-400 uppercase">Recommendation</span>
+                {analysis.recommendation}
+              </div>
+            )}
+
+            {(analysis.investigationId || analysis.evidenceId) && (
+              <div className="flex items-center gap-1.5 text-[9px] font-mono text-slate-400">
+                {analysis.investigationId && (
+                  <span className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+                    ID: {analysis.investigationId}
+                  </span>
+                )}
+                {analysis.evidenceId && (
+                  <span className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 truncate max-w-[170px]">
+                    EV: {analysis.evidenceId}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="space-y-1">
               <span className="text-[10px] font-mono text-slate-400 uppercase">Key Security Findings</span>
@@ -312,6 +334,7 @@ export function PopupPage() {
                 ))}
               </ul>
             </div>
+
           </div>
         )}
       </main>

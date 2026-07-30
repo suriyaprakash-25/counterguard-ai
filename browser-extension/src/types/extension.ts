@@ -28,12 +28,17 @@ export interface SecurityAnalysisResult {
   marketplace: string;
   threatLevel: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "SAFE";
   threatScore: number; // 0 to 100
+  sellerTrust?: number; // 0 to 100
+  recommendation?: string;
+  investigationId?: string;
+  evidenceId?: string;
   verdict: string;
   matchedListingsCount: number;
   confidenceScore: number;
   analyzedAt: string;
   findings: string[];
 }
+
 
 export interface ExtensionState {
   settings: ExtensionSettings;

@@ -34,3 +34,15 @@ export interface ProviderHealthItem {
 export interface ProviderHealthResponse {
   providers: ProviderHealthItem[];
 }
+
+export interface BrowserAnalysisResponse {
+  risk_score: number;
+  threat_level: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "SAFE";
+  seller_trust: number;
+  recommendation: string;
+  investigation_id: string;
+  evidence_id: string;
+  findings: string[];
+  analyzed_at: string;
+}
+

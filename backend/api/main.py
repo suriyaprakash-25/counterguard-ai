@@ -9,7 +9,9 @@ from backend.api.routes import (
     alerts,
     analytics,
     auth,
+    browser,
     case_management,
+
     closed_loop,
     dashboard,
     discovery,
@@ -120,7 +122,9 @@ api_router.include_router(settings.router, tags=["Settings"])
 api_router.include_router(investigation.router, tags=["Investigation"])
 api_router.include_router(investigations.router, tags=["Investigation History"])
 api_router.include_router(providers.router, tags=["Providers"])
+api_router.include_router(browser.router, tags=["Browser Extension"])
 app.include_router(api_router)
+
 
 
 @app.get("/health", tags=["System"])

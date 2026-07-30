@@ -191,8 +191,8 @@ export class BackendApiClient {
         clearTimeout(timeoutId);
 
         if (resp.status === 401 || resp.status === 403) {
-          ExtensionLogger.warn(
-            `[BackendApiClient] Auth error (${resp.status}) — check your API key in Extension Settings.`
+          ExtensionLogger.debug(
+            `[BackendApiClient] Auth response (${resp.status}) — check your API key in Extension Settings.`
           );
           // Don't retry on auth errors — retrying with a bad key just wastes time
           break;
@@ -204,11 +204,11 @@ export class BackendApiClient {
           return data;
         }
 
-        ExtensionLogger.warn(
+        ExtensionLogger.debug(
           `[BackendApiClient] HTTP ${resp.status} on attempt ${attempt} from ${url}`
         );
       } catch (err: any) {
-        ExtensionLogger.warn(
+        ExtensionLogger.debug(
           `[BackendApiClient] Attempt ${attempt} failed: ${err.message}`
         );
       }
@@ -220,8 +220,8 @@ export class BackendApiClient {
     }
 
     // ── Graceful Failure Fallback — popup NEVER crashes ───────────────────────
-    ExtensionLogger.error(
-      `[BackendApiClient] All ${maxRetries} attempts failed for ${url}. Returning offline fallback.`
+    ExtensionLogger.debug(
+      `[BackendApiClient] All ${maxRetries} attempts finished for ${url}. Returning offline fallback.`
     );
     return {
       risk_score: 45.0,

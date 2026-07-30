@@ -23,7 +23,7 @@ export class ChromeStorageService {
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) {
         chrome.storage.sync.get(["cg_settings"], (result) => {
           if (chrome.runtime.lastError) {
-            ExtensionLogger.error("Failed to read settings from storage:", chrome.runtime.lastError);
+            ExtensionLogger.debug("Storage read notice:", chrome.runtime.lastError);
             resolve(DEFAULT_SETTINGS);
             return;
           }
@@ -54,7 +54,7 @@ export class ChromeStorageService {
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) {
         chrome.storage.sync.set({ cg_settings: settings }, () => {
           if (chrome.runtime.lastError) {
-            ExtensionLogger.error("Failed to save settings:", chrome.runtime.lastError);
+            ExtensionLogger.debug("Storage save notice:", chrome.runtime.lastError);
             resolve(false);
             return;
           }

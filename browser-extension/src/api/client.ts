@@ -173,13 +173,13 @@ export class BackendApiClient {
   }
 
   /**
-   * Create Investigation — Register live investigation in CounterGuard
+   * Start Live Investigation — Spawns LangGraph workflow on FastAPI backend
    */
-  static async createInvestigation(
+  static async startLiveInvestigation(
     baseUrl: string,
-    query: string
-  ): Promise<{ success: boolean; id?: string; message?: string }> {
-    const url = `${baseUrl.replace(/\/$/, "")}/api/v1/investigations`;
+    productCard: any
+  ): Promise<{ success: boolean; investigationId?: string; evidenceId?: string; message?: string }> {
+    const url = `${baseUrl.replace(/\/$/, "")}/api/v1/browser/investigation/create`;
     try {
       const resp = await fetch(url, {
         method: "POST",
@@ -187,18 +187,56 @@ export class BackendApiClient {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ query: query, depth: "standard" }),
+        body: JSON.stringify({
+          title: productCard.title || "Target Product",
+          seller: productCard.seller || "Unverified Seller",
+          price: productCard.price || 0,
+          currency: productCard.currency || "INR",
+          url: productCard.url,
+          image: productCard.image,
+          marketplace: productCard.marketplace || "Amazon",
+          confidence_score: productCard.confidenceScore || 100.0,
+        }),
       });
+
       if (resp.ok) {
         const data = await resp.json();
-        return { success: true, id: data.id || data.investigation_id };
+        return {
+          success: true,
+          investigationId: data.investigation_id,
+          evidenceId: data.evidence_id,
+        };
       }
       return { success: false, message: `HTTP ${resp.status}` };
     } catch (err: any) {
-      ExtensionLogger.error("Failed to create investigation:", err);
+      ExtensionLogger.error("Failed to start live investigation:", err);
+      return { success: false, message: err.message };
+    }
+  }
+
+  /**
+   * Cancel Active Investigation — Stop LangGraph agent execution
+   */
+  static async cancelInvestigation(
+    baseUrl: string,
+    investigationId: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const url = `${baseUrl.replace(/\/$/, "")}/api/v1/browser/investigation/${investigationId}/cancel`;
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      if (resp.ok) {
+        return { success: true };
+      }
+      return { success: false, message: `HTTP ${resp.status}` };
+    } catch (err: any) {
+      ExtensionLogger.error(`Failed to cancel investigation ${investigationId}:`, err);
       return { success: false, message: err.message };
     }
   }
 }
+
 
 

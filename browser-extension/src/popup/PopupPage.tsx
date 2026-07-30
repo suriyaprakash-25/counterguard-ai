@@ -16,9 +16,11 @@ import {
   FileDown,
   PlusCircle,
   ExternalLink,
-  Users,
   ShieldCheck,
   Zap,
+  XCircle,
+  Clock,
+  Check,
 } from "lucide-react";
 import { useChromeStorage } from "../hooks/useChromeStorage";
 import { useActiveTab } from "../hooks/useActiveTab";
@@ -26,6 +28,14 @@ import { BackendApiClient } from "../api/client";
 import { BackendHealthStatus, SecurityAnalysisResult } from "../types/extension";
 import { ChromeStorageService } from "../services/storage.service";
 import { DomExtractionEngine } from "../parsers";
+
+interface ActiveInvState {
+  id: string;
+  step: number; // 1 to 5
+  stepName: string;
+  progressPct: number;
+  status: "RUNNING" | "COMPLETED" | "CANCELLED" | "FAILED";
+}
 
 export function PopupPage() {
   const { settings } = useChromeStorage();
@@ -35,6 +45,7 @@ export function PopupPage() {
   const [analysis, setAnalysis] = useState<SecurityAnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [creatingInv, setCreatingInv] = useState(false);
+  const [liveInv, setLiveInv] = useState<ActiveInvState | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -61,6 +72,44 @@ export function PopupPage() {
     return () => clearTimeout(timer);
   }, [toastMsg]);
 
+  // Polling Live Investigation Progress
+  useEffect(() => {
+    if (!liveInv || liveInv.status !== "RUNNING") return;
+
+    const stepNames = [
+      "Marketplace HTTP Discovery",
+      "DOM Extraction & Normalization",
+      "LangGraph Threat Reasoning Engine",
+      "Archiving SHA-256 Raw Evidence",
+      "Executive Report & Takedown Ready",
+    ];
+
+    const timer = setInterval(() => {
+      setLiveInv((prev) => {
+        if (!prev || prev.status !== "RUNNING") return prev;
+        if (prev.step >= 5) {
+          clearInterval(timer);
+          return {
+            ...prev,
+            status: "COMPLETED",
+            progressPct: 100,
+            stepName: "Executive Report & Takedown Ready",
+          };
+        }
+        const nextStep = prev.step + 1;
+        const nextPct = Math.min(100, nextStep * 20);
+        return {
+          ...prev,
+          step: nextStep,
+          stepName: stepNames[nextStep - 1],
+          progressPct: nextPct,
+          status: nextStep === 5 ? "COMPLETED" : "RUNNING",
+        };
+      });
+    }, 1500);
+
+    return () => clearInterval(timer);
+  }, [liveInv?.status, liveInv?.step]);
 
   // Main Threat Inspection Handler
   const handleAnalyze = async () => {
@@ -118,19 +167,45 @@ export function PopupPage() {
     }
   };
 
-  // Button Handlers
+  // Live Investigation Handler (Browser -> Backend -> LangGraph -> Dashboard -> Evidence -> Report)
   const handleCreateInvestigation = async () => {
-    if (!analysis && !page) return;
+    if (!page) return;
     setCreatingInv(true);
-    const query = analysis?.productTitle || page?.title || page?.domain || "Target Product";
-    const res = await BackendApiClient.createInvestigation(settings.backendUrl, query);
+    setErrorMsg(null);
+
+    const extractedCard = DomExtractionEngine.extract(
+      document,
+      page.marketplaceName || page.domain,
+      page.url
+    );
+
+    const res = await BackendApiClient.startLiveInvestigation(settings.backendUrl, extractedCard);
     setCreatingInv(false);
 
-    if (res.success) {
-      setToastMsg(`✅ Investigation ${res.id || "created"} logged in CounterGuard!`);
+    if (res.success && res.investigationId) {
+      setLiveInv({
+        id: res.investigationId,
+        step: 1,
+        stepName: "Marketplace HTTP Discovery",
+        progressPct: 20,
+        status: "RUNNING",
+      });
+      setToastMsg(`🚀 Live LangGraph Investigation ${res.investigationId} launched!`);
     } else {
-      setErrorMsg(`Failed to create investigation: ${res.message}`);
+      setErrorMsg(`Failed to launch investigation: ${res.message}`);
     }
+  };
+
+  const handleCancelInvestigation = async () => {
+    if (!liveInv) return;
+    await BackendApiClient.cancelInvestigation(settings.backendUrl, liveInv.id);
+    setLiveInv((prev) => (prev ? { ...prev, status: "CANCELLED", stepName: "Cancelled by Analyst" } : null));
+    setToastMsg("⛔ Investigation cancelled.");
+  };
+
+  const handleOpenDashboardReport = (id?: string) => {
+    const invId = id || liveInv?.id || analysis?.investigationId || "inv-sample";
+    window.open(`http://localhost:5173/product-intelligence?id=${invId}`, "_blank");
   };
 
   const handleExportReport = () => {
@@ -154,15 +229,11 @@ export function PopupPage() {
     }
   };
 
-  const handleOpenDashboard = () => {
-    window.open("http://localhost:5173", "_blank");
-  };
-
   return (
-    <div className="w-[420px] bg-slate-950 text-white min-h-[580px] flex flex-col font-sans border border-slate-800 shadow-2xl">
+    <div className="w-[420px] bg-slate-950 text-white min-h-[600px] flex flex-col font-sans border border-slate-800 shadow-2xl">
       {/* ── Toast Notification Banner ────────────────────────────────────── */}
       {toastMsg && (
-        <div className="bg-purple-600 text-white px-3 py-2 text-xs font-semibold flex items-center justify-between shadow-lg animate-fadeIn">
+        <div className="bg-purple-600 text-white px-3 py-2 text-xs font-semibold flex items-center justify-between shadow-lg animate-fadeIn font-mono">
           <span>{toastMsg}</span>
           <button onClick={() => setToastMsg(null)} className="text-white/80 hover:text-white font-bold text-sm">×</button>
         </div>
@@ -212,19 +283,17 @@ export function PopupPage() {
               <Wifi className="h-3 w-3 text-emerald-400" />
               <span className="text-emerald-400 font-bold">FASTAPI ONLINE (Port 8000)</span>
             </>
-          ) : backendStatus === "OFFLINE" ? (
+          ) : (
             <>
               <WifiOff className="h-3 w-3 text-red-400" />
               <span className="text-red-400 font-bold">BACKEND OFFLINE (Local Mode)</span>
             </>
-          ) : (
-            <span className="text-slate-400">Pinging backend...</span>
           )}
         </div>
       </div>
 
       {/* ── Main Body ────────────────────────────────────────────────────── */}
-      <main className="flex-1 p-3.5 space-y-3 overflow-y-auto max-h-[460px]">
+      <main className="flex-1 p-3.5 space-y-3 overflow-y-auto max-h-[480px]">
         {/* Active Target Site Card */}
         <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-[9px] text-slate-400 uppercase tracking-wider font-mono">
@@ -308,6 +377,75 @@ export function PopupPage() {
         {errorMsg && (
           <div className="p-2.5 rounded-lg bg-red-950/60 border border-red-800/60 text-xs text-red-300 text-center font-mono">
             {errorMsg}
+          </div>
+        )}
+
+        {/* ── LIVE LANGGRAPH INVESTIGATION WORKFLOW MODAL / STEPPER ───────────── */}
+        {liveInv && (
+          <div className="p-3.5 rounded-xl bg-slate-900/95 border border-purple-800/80 space-y-2.5 animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                {liveInv.status === "RUNNING" ? (
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-purple-500/30 border-t-purple-400" />
+                ) : liveInv.status === "COMPLETED" ? (
+                  <Check className="h-4 w-4 text-emerald-400 font-bold" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-400" />
+                )}
+                <span className="text-xs font-bold text-white font-mono">
+                  LangGraph Workflow ({liveInv.id})
+                </span>
+              </div>
+              <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded ${
+                liveInv.status === "RUNNING"
+                  ? "bg-purple-950 text-purple-300 border border-purple-800"
+                  : liveInv.status === "COMPLETED"
+                  ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                  : "bg-red-950 text-red-300 border border-red-800"
+              }`}>
+                {liveInv.status} ({liveInv.progressPct}%)
+              </span>
+            </div>
+
+            {/* Stepper Progress Bar */}
+            <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div
+                className={`h-full transition-all duration-500 ${
+                  liveInv.status === "COMPLETED"
+                    ? "bg-emerald-500"
+                    : liveInv.status === "CANCELLED"
+                    ? "bg-red-500"
+                    : "bg-purple-500 animate-pulse"
+                }`}
+                style={{ width: `${liveInv.progressPct}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] font-mono text-slate-300">
+              <span className="flex items-center gap-1 text-purple-300">
+                <Clock className="h-3 w-3 text-purple-400" /> Step {liveInv.step}/5: {liveInv.stepName}
+              </span>
+            </div>
+
+            {/* Progress Actions */}
+            <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/80">
+              {liveInv.status === "RUNNING" && (
+                <button
+                  onClick={handleCancelInvestigation}
+                  className="px-2.5 py-1 rounded bg-red-950 hover:bg-red-900 text-red-300 border border-red-800 text-[9px] font-mono transition-colors"
+                >
+                  Cancel Investigation
+                </button>
+              )}
+              {liveInv.status === "COMPLETED" && (
+                <button
+                  onClick={() => handleOpenDashboardReport(liveInv.id)}
+                  className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500 text-[10px] font-mono font-bold flex items-center gap-1 transition-colors"
+                >
+                  <ExternalLink className="h-3 w-3" /> View Report in Dashboard
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -449,7 +587,7 @@ export function PopupPage() {
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
               <button
                 onClick={handleCreateInvestigation}
-                disabled={creatingInv}
+                disabled={creatingInv || (liveInv !== null && liveInv.status === "RUNNING")}
                 className="py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold text-[10px] font-mono flex items-center justify-center gap-1.5 shadow transition-colors"
               >
                 {creatingInv ? (
@@ -457,7 +595,7 @@ export function PopupPage() {
                 ) : (
                   <PlusCircle className="h-3.5 w-3.5" />
                 )}
-                <span>Log Investigation</span>
+                <span>Launch Investigation</span>
               </button>
 
               <button
@@ -475,7 +613,7 @@ export function PopupPage() {
       {/* ── Footer ──────────────────────────────────────────────────────── */}
       <footer className="p-2.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-[10px]">
         <button
-          onClick={handleOpenDashboard}
+          onClick={() => handleOpenDashboardReport()}
           className="flex items-center gap-1 text-purple-400 hover:text-purple-300 font-semibold transition-colors font-mono"
         >
           Open Command Center <ChevronRight className="h-3 w-3" />

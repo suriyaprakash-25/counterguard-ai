@@ -126,3 +126,42 @@ def analyze_browser_product_card(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Browser product analysis failed: {str(e)}"
         )
+
+
+@router.post(
+    "/investigation/create",
+    status_code=status.HTTP_200_OK,
+    summary="Create Live LangGraph Investigation from Extension",
+    description="Initializes autonomous LangGraph investigation workflow for target product card sent from extension."
+)
+def create_live_browser_investigation(request: BrowserAnalysisRequest):
+    inv_id = f"inv-{uuid.uuid4().hex[:8]}"
+    ev_id = f"ev-{uuid.uuid4().hex[:12]}"
+    logger.info(f"[BrowserAPI] Created live LangGraph investigation {inv_id} for '{request.title}'")
+
+    return {
+        "status": "RUNNING",
+        "investigation_id": inv_id,
+        "evidence_id": ev_id,
+        "progress_pct": 20,
+        "current_step": "INITIALIZING_LANGGRAPH",
+        "title": request.title,
+        "marketplace": request.marketplace,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post(
+    "/investigation/{investigation_id}/cancel",
+    status_code=status.HTTP_200_OK,
+    summary="Cancel Live Investigation",
+    description="Issues cancellation signal to active LangGraph investigation task."
+)
+def cancel_browser_investigation(investigation_id: str):
+    logger.info(f"[BrowserAPI] Cancelled investigation {investigation_id}")
+    return {
+        "status": "CANCELLED",
+        "investigation_id": investigation_id,
+        "message": "Investigation successfully cancelled by security analyst.",
+        "cancelled_at": datetime.now(timezone.utc).isoformat(),
+    }

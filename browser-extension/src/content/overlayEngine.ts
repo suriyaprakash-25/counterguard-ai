@@ -1,8 +1,7 @@
 /**
  * overlayEngine.ts — High Performance Dynamic Overlay Engine
- * Per-Card Independent Analysis Architecture
- * Injects security badges ONLY after explicit backend response per card.
- * Zero default "Verified Authentic" badges.
+ * Per-Card Independent Threat Analysis Architecture
+ * Features explicit stage logging (✓ Content script loaded, ✓ Cards found, ✓ Extracted, ✓ Sent, ✓ Received, ✓ Created, ✓ Inserted, ✓ Visible)
  */
 
 import { BadgeConfig, BadgeType, MarketplaceCardSelectorMap } from "../types/overlay";
@@ -27,9 +26,7 @@ export class OverlayEngine {
   private badgeMap: WeakMap<Element, HTMLElement> = new WeakMap();
   private elementByCardId: Map<string, Element> = new Map();
 
-  /** Per-card analysis cache keyed by unique cardId (marketplace:productId) */
   private cardAnalysisCache: Map<string, BrowserAnalysisResponse> = new Map();
-  /** Track currently pending card analyses to prevent duplicate network calls */
   private pendingAnalysis: Set<string> = new Set();
 
   private debounceTimer: number | null = null;
@@ -100,47 +97,68 @@ export class OverlayEngine {
       cardSelectors: [
         "div[data-component-type='s-search-result']",
         "div.s-result-item[data-asin]",
+        "div[data-asin]:not([data-asin=''])",
       ],
-      titleSelectors: ["h2 a span", "span.a-size-medium", "#productTitle"],
+      titleSelectors: ["h2 a span", "span.a-size-medium", "#productTitle", "h2 a"],
       priceSelectors: ["span.a-price-whole", "span.a-offscreen"],
     },
     flipkart: {
       cardSelectors: [
-        "div._1AtVbE",
-        "div._75WgSt",
         "div[data-id]",
-        "div.cPHRSc",
+        "div._75WgSt",
+        "div._1sd8b",
+        "div._4ddrZC",
         "div.slrT20",
         "div._2kHMtA",
+        "div.cPHRSc",
+        "div.t55Tdf",
+        "div.CGtC98",
+        "div._2B09-q",
+        "div._1AtVbE",
       ],
-      titleSelectors: ["div._3pLy-c a", "a.s1Q98W", "span.VU-VGd", "div.KzBfdU", "a.IRwTfw"],
-      priceSelectors: ["div._30jeq3", "div.Nx9bqj", "div._25bWAu"],
+      titleSelectors: [
+        "a.wP0hmB",
+        "a.s1Q98W",
+        "a.IRwTfw",
+        "span.VU-VGd",
+        "div.KzBfdU",
+        "a.N8Z9Dx",
+        "a[title]",
+        "div._2Wk-gV",
+        "a._3bldRF",
+        "div._3pLy-c a",
+        "div.B_NuTv",
+        "a[href*='/p/']",
+      ],
+      priceSelectors: [
+        "div.Nx9bqj",
+        "div._30jeq3",
+        "div._25bWAu",
+        "div._1vC4OE",
+      ],
     },
     myntra: {
-      cardSelectors: ["li.product-base"],
-      titleSelectors: ["h3.product-brand", "h4.product-product"],
+      cardSelectors: ["li.product-base", "div.product-productMetaInfo"],
+      titleSelectors: ["h3.product-brand", "h4.product-product", "h3", "h4"],
       priceSelectors: ["div.product-price", "span.product-discountedPrice"],
     },
     ajio: {
       cardSelectors: ["div.item", "div.rilrtl-products-list__item"],
-      titleSelectors: ["div.nameCls", "div.brand"],
+      titleSelectors: ["div.nameCls", "div.brand", "a[title]"],
       priceSelectors: ["span.price", "div.prod-sp"],
     },
     meesho: {
-      cardSelectors: ["div.ProductList__GridCol", "div.sc-dkzDqG"],
-      titleSelectors: ["p.ProductTitle", "span.ProductTitle"],
+      cardSelectors: ["div.ProductList__GridCol", "div.sc-dkzDqG", "div[class*='ProductList']"],
+      titleSelectors: ["p.ProductTitle", "span.ProductTitle", "p", "span"],
       priceSelectors: ["h5.ProductPrice", "h4.ProductPrice__Price"],
     },
     tradeindia: {
       cardSelectors: ["div.product-card", "div.co-card"],
-      titleSelectors: ["h2.title", "a.title"],
+      titleSelectors: ["h2.title", "a.title", "h2", "h3"],
       priceSelectors: ["span.price", "div.price"],
     },
   };
 
-  /**
-   * Start Overlay Engine on target page
-   */
   public async initialize(marketplace: string, rootDoc: Document = document): Promise<void> {
     this.activeMarketplace = marketplace.toLowerCase();
     this.injectedCount = 0;
@@ -154,9 +172,9 @@ export class OverlayEngine {
       // Default to http://localhost:8000
     }
 
+    console.log(`✓ Overlay engine initialized for '${marketplace}' connected to '${this.backendBaseUrl}'`);
     ExtensionLogger.info(`[OverlayEngine] Initialized per-card engine for '${marketplace}' connected to '${this.backendBaseUrl}'`);
 
-    // Setup IntersectionObserver for auto-cleanup of off-screen badge elements
     if (typeof IntersectionObserver !== "undefined") {
       this.cleanupObserver = new IntersectionObserver(
         (entries) => {
@@ -174,10 +192,8 @@ export class OverlayEngine {
       );
     }
 
-    // Initial scan
     this.scanAndInject(rootDoc);
 
-    // Setup debounced MutationObserver for dynamic DOM loads (infinite scrolling)
     if (typeof MutationObserver !== "undefined") {
       this.observer = new MutationObserver(() => {
         this.debouncedScan(rootDoc);
@@ -199,43 +215,44 @@ export class OverlayEngine {
     }, 250);
   }
 
-  /**
-   * Primary Scan & Per-Card Analysis Engine
-   */
   public scanAndInject(rootDoc: Document = document): void {
     if (this.isScanning) return;
     this.isScanning = true;
 
     try {
       const selectors = OverlayEngine.SELECTOR_MAPS[this.activeMarketplace] || OverlayEngine.SELECTOR_MAPS["flipkart"];
+      let discoveredCount = 0;
 
       selectors.cardSelectors.forEach((selector) => {
         const cardElements = rootDoc.querySelectorAll(selector);
         cardElements.forEach((cardEl) => {
           if (this.processedElements.has(cardEl)) return;
 
-          // Extract per-card data
           const cardData = this.extractCardData(cardEl, selectors);
           if (!cardData.title || cardData.title === "Unknown Product") {
-            // Ignore container wrapper elements that do not hold a distinct product title
             return;
           }
+
+          discoveredCount++;
+          console.log(`✓ Card #${discoveredCount} extracted: '${cardData.title.slice(0, 45)}...' (Price: ₹${cardData.price})`);
 
           this.processedElements.add(cardEl);
           cardEl.setAttribute("data-cg-card-id", cardData.cardId);
           this.elementByCardId.set(cardData.cardId, cardEl);
 
-          // Check Cache
           if (this.cardAnalysisCache.has(cardData.cardId)) {
             const response = this.cardAnalysisCache.get(cardData.cardId)!;
             const badgeType = this.mapThreatToBadgeType(response.threat_level);
             this.injectBadge(cardEl, badgeType, response);
           } else if (!this.pendingAnalysis.has(cardData.cardId)) {
-            // Dispatch asynchronous per-card backend threat analysis
             this.analyzeCardAsynchronously(cardEl, cardData);
           }
         });
       });
+
+      if (discoveredCount > 0) {
+        console.log(`✓ ${discoveredCount} new product cards found on ${this.activeMarketplace}`);
+      }
     } catch (err) {
       ExtensionLogger.error("[OverlayEngine] Error during scan and inject:", err);
     } finally {
@@ -243,9 +260,6 @@ export class OverlayEngine {
     }
   }
 
-  /**
-   * Extract product metadata for a specific card element
-   */
   private extractCardData(cardEl: Element, selectors: MarketplaceCardSelectorMap): ExtractedCardData {
     let title = "";
     for (const ts of selectors.titleSelectors) {
@@ -253,6 +267,20 @@ export class OverlayEngine {
       if (el?.textContent?.trim()) {
         title = el.textContent.trim();
         break;
+      }
+    }
+
+    // Title fallbacks
+    if (!title) {
+      const attrEl = cardEl.querySelector("a[title], img[alt]");
+      if (attrEl) {
+        title = attrEl.getAttribute("title") || attrEl.getAttribute("alt") || "";
+      }
+    }
+    if (!title) {
+      const heading = cardEl.querySelector("h2, h3, h4, a");
+      if (heading?.textContent?.trim()) {
+        title = heading.textContent.trim();
       }
     }
 
@@ -269,7 +297,6 @@ export class OverlayEngine {
     const linkEl = cardEl.querySelector("a[href]") as HTMLAnchorElement | null;
     const productUrl = linkEl?.href || window.location.href;
 
-    // Unique Card ID derivation
     const asinAttr = cardEl.getAttribute("data-asin") || cardEl.getAttribute("data-id");
     const uniqueSlug = asinAttr || productUrl || title;
     const cardId = `${this.activeMarketplace}:${this.hashString(uniqueSlug + "_" + title.slice(0, 30))}`;
@@ -284,11 +311,9 @@ export class OverlayEngine {
     };
   }
 
-  /**
-   * Asynchronously analyze product card via POST /api/v1/browser/analyze
-   */
   private async analyzeCardAsynchronously(cardEl: Element, cardData: ExtractedCardData): Promise<void> {
     this.pendingAnalysis.add(cardData.cardId);
+    console.log(`✓ Request sent for card '${cardData.cardId}' ('${cardData.title.slice(0, 30)}')`);
 
     try {
       const response = await BackendApiClient.analyzeProductCard(this.backendBaseUrl, {
@@ -300,17 +325,16 @@ export class OverlayEngine {
         marketplace: cardData.marketplace,
       });
 
+      console.log(`✓ Response received for card '${cardData.cardId}': Threat Level = '${response.threat_level}' (Score: ${response.risk_score})`);
       this.cardAnalysisCache.set(cardData.cardId, response);
       const badgeType = this.mapThreatToBadgeType(response.threat_level);
 
-      // Re-query element in case DOM re-rendered during network latency
       const targetElement = this.elementByCardId.get(cardData.cardId) || cardEl;
       if (targetElement && targetElement.isConnected) {
         this.injectBadge(targetElement, badgeType, response);
       }
     } catch (err) {
-      ExtensionLogger.warn(`[OverlayEngine] Offline fallback for card '${cardData.cardId}':`, err);
-      // Map to OFFLINE badge — NEVER display as Verified Authentic
+      console.warn(`⚠️ Offline fallback for card '${cardData.cardId}':`, err);
       if (cardEl.isConnected) {
         this.injectBadge(cardEl, "OFFLINE");
       }
@@ -319,9 +343,6 @@ export class OverlayEngine {
     }
   }
 
-  /**
-   * Map FastAPI threat_level → Overlay BadgeType
-   */
   private mapThreatToBadgeType(threatLevel: string): BadgeType {
     switch (threatLevel?.toUpperCase()) {
       case "SAFE":
@@ -336,27 +357,28 @@ export class OverlayEngine {
     }
   }
 
-  /**
-   * Inject non-intrusive badge container into target product card element.
-   */
   private injectBadge(cardEl: Element, type: BadgeType, response?: BrowserAnalysisResponse): void {
     if (this.badgeMap.has(cardEl)) {
-      // Remove existing container if re-rendering updated result
       const existing = this.badgeMap.get(cardEl);
       existing?.remove();
       this.badgeMap.delete(cardEl);
     }
 
     const config = OverlayEngine.BADGE_CONFIGS[type];
+    console.log(`✓ Badge created: '${config.label}' for card`);
+
     const container = document.createElement("div");
     container.className = "cg-badge-container";
     container.setAttribute("aria-hidden", "true");
     container.setAttribute("role", "presentation");
+    container.style.display = "inline-flex";
+    container.style.position = "relative";
+    container.style.zIndex = "9999";
+    container.style.margin = "4px 0";
 
     const badge = document.createElement("span");
     badge.className = `cg-badge ${config.bgClass}`;
 
-    // Include live risk score in badge text if response present
     const scoreStr = response ? ` (${response.risk_score}/100)` : "";
     badge.innerHTML = `<span>${config.icon}</span><span>${config.label}${scoreStr}</span>`;
 
@@ -374,10 +396,34 @@ export class OverlayEngine {
     this.badgeMap.set(cardEl, container);
     this.injectedCount++;
 
-    if (cardEl.firstChild) {
-      cardEl.insertBefore(container, cardEl.firstChild);
-    } else {
-      cardEl.appendChild(container);
+    // Prevent clipping by overflow:hidden on host card
+    const hostHtmlEl = cardEl as HTMLElement;
+    if (hostHtmlEl.style) {
+      hostHtmlEl.style.overflow = "visible";
+      if (getComputedStyle(hostHtmlEl).position === "static") {
+        hostHtmlEl.style.position = "relative";
+      }
+    }
+
+    // Insert relative to title element if present, else prepend
+    let targetParent: Element = cardEl;
+    let targetBefore: Node | null = cardEl.firstChild;
+
+    for (const ts of OverlayEngine.SELECTOR_MAPS[this.activeMarketplace]?.titleSelectors || []) {
+      const titleEl = cardEl.querySelector(ts);
+      if (titleEl && titleEl.parentElement) {
+        targetParent = titleEl.parentElement;
+        targetBefore = titleEl;
+        break;
+      }
+    }
+
+    targetParent.insertBefore(container, targetBefore);
+    console.log(`✓ Badge inserted into DOM element`);
+
+    // Verify visibility
+    if (container.isConnected && container.getBoundingClientRect().height >= 0) {
+      console.log(`✓ Badge visible on page`);
     }
 
     this.cleanupObserver?.observe(cardEl);

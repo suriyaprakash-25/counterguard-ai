@@ -35,6 +35,7 @@ function injectOverlayStyles(): void {
   (document.head || document.documentElement).appendChild(style);
 }
 
+console.log("✓ Content script loaded on:", window.location.href);
 ExtensionLogger.info(`[ContentScript] CounterGuard initialized on: ${window.location.href}`);
 
 // Inject badge styles before overlay engine runs

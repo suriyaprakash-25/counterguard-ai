@@ -1,78 +1,63 @@
 import logging
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
-from backend.providers.extraction.api_provider import StructuredApiExtractionProvider
-from backend.providers.extraction.base_provider import ExtractionProvider
-from backend.providers.extraction.html_provider import HTMLExtractionProvider
-from backend.providers.extraction.jsonld_provider import JsonLdExtractionProvider
+from backend.schemas.canonical_product import CanonicalProductKnowledge
 from backend.schemas.discovery_engine import SourceCandidate
 from backend.schemas.official_product import OfficialProductProfile
 from backend.schemas.raw_extraction import RawExtractionResult
-from backend.services.extraction_normalization_engine import (
-    ExtractionNormalizationEngine,
-)
-from backend.services.extraction_validation_engine import ExtractionValidationEngine
+from backend.services.canonical_knowledge_builder import CanonicalKnowledgeBuilder
+from backend.services.extraction_orchestrator import ExtractionOrchestrator
 
 logger = logging.getLogger(__name__)
 
 
 class ReferenceExtractionService:
     """
-    ReferenceExtractionService (Sprint 17 Phase 3 Foundation)
+    ReferenceExtractionService (Sprint 17 Service Interface)
 
-    Orchestrates the extraction pipeline flow:
-      Verified Source (SourceCandidate)
+    Delegates extraction strategy selection, fallback cascades, provider fusion, and validation
+    to `ExtractionOrchestrator`, and builds unified `CanonicalProductKnowledge` objects for AI agents via `CanonicalKnowledgeBuilder`.
+
+    Architecture Flow:
+      ReferenceExtractionService
               ↓
-      ExtractionProvider Selection & Execution (Strategy Architecture)
+      ExtractionOrchestrator (Cascade & Fusion)
               ↓
-      RawExtractionResult (Un-normalized Intermediate Model)
+      RawExtractionResult -> Normalization -> Validation -> OfficialProductProfile
               ↓
-      ExtractionNormalizationEngine (Canonical Unit & String Normalization)
+      CanonicalKnowledgeBuilder
               ↓
-      ExtractionValidationEngine (Quality Threshold Check)
-              ↓
-      OfficialProductProfile
+      CanonicalProductKnowledge (Consumed by Specialist AI Agents)
     """
 
-    def __init__(self, providers: Optional[List[ExtractionProvider]] = None):
-        self.providers: List[ExtractionProvider] = providers or [
-            JsonLdExtractionProvider(),
-            StructuredApiExtractionProvider(),
-            HTMLExtractionProvider(),  # Fallback strategy
-        ]
-        self.normalization_engine = ExtractionNormalizationEngine()
-        self.validation_engine = ExtractionValidationEngine()
+    def __init__(
+        self,
+        orchestrator: Optional[ExtractionOrchestrator] = None,
+        knowledge_builder: Optional[CanonicalKnowledgeBuilder] = None,
+    ):
+        self.orchestrator = orchestrator or ExtractionOrchestrator()
+        self.knowledge_builder = knowledge_builder or CanonicalKnowledgeBuilder()
         logger.info(
-            f"[ReferenceExtractionService] Initialized with {len(self.providers)} extraction providers."
+            "[ReferenceExtractionService] Initialized with ExtractionOrchestrator and CanonicalKnowledgeBuilder."
         )
-
-    def select_provider(self, candidate: SourceCandidate) -> ExtractionProvider:
-        """Selects the first matching extraction strategy provider for a given SourceCandidate."""
-        for provider in self.providers:
-            if provider.supports(candidate):
-                return provider
-        return self.providers[-1]  # Default fallback to HTMLExtractionProvider
 
     def extract_profile(
         self, candidate: SourceCandidate, raw_content: str = ""
     ) -> Tuple[RawExtractionResult, OfficialProductProfile, bool]:
         """
-        Primary extraction entry point executing the full extraction pipeline.
-        Returns Tuple[RawExtractionResult, OfficialProductProfile, is_valid: bool].
+        Extracts raw result and normalized profile baseline via ExtractionOrchestrator.
         """
-        logger.debug(
-            f"[ReferenceExtractionService] Starting extraction for candidate '{candidate.url}'."
+        return self.orchestrator.execute_extraction_cascade(
+            candidate=candidate, raw_content=raw_content
         )
 
-        # STAGE 1: Strategy Provider Selection & Execution
-        provider = self.select_provider(candidate)
-        raw_result = provider.extract(candidate=candidate, raw_content=raw_content)
-
-        # STAGE 2: Normalization
-        normalized_profile = self.normalization_engine.normalize(raw_result)
-
-        # STAGE 3: Validation
-        is_valid, reason = self.validation_engine.validate(normalized_profile)
-        normalized_profile.metadata["validation_reason"] = reason
-
-        return raw_result, normalized_profile, is_valid
+    def extract_canonical_knowledge(
+        self, candidate: SourceCandidate, raw_content: str = ""
+    ) -> Tuple[CanonicalProductKnowledge, bool]:
+        """
+        Primary entry point: Executes extraction cascade and compiles unified CanonicalProductKnowledge
+        for downstream AI specialist agents (BrandAgent, PriceAgent, VisionAgent, MetadataAgent).
+        """
+        _, profile, is_valid = self.extract_profile(candidate, raw_content)
+        canonical_knowledge = self.knowledge_builder.build_from_profile(profile)
+        return canonical_knowledge, is_valid

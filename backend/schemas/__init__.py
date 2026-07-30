@@ -1,3 +1,4 @@
+from backend.schemas.canonical_product import CanonicalProductKnowledge
 from backend.schemas.discovery_engine import DiscoveryResult, SourceCandidate
 from backend.schemas.extraction_evidence import ExtractionEvidence
 from backend.schemas.history import (
@@ -33,4 +34,5 @@ __all__ = [
     "DiscoveryResult",
     "RawExtractionResult",
     "ExtractionEvidence",
+    "CanonicalProductKnowledge",
 ]

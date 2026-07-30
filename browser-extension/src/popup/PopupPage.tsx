@@ -118,7 +118,7 @@ function TabSkeleton({ isHistory }: { isHistory?: boolean }) {
 //  MAIN POPUP PAGE
 // ════════════════════════════════════════════════════════════════════════════
 export function PopupPage() {
-  const { settings } = useChromeStorage();
+  const { settings, updateSettings } = useChromeStorage();
   const { page, loading: tabLoading } = useActiveTab();
   const { isOffline } = useOfflineMode();
 

@@ -5,6 +5,7 @@ export interface ExtensionSettings {
   apiKey: string;              // API key stored in Chrome Storage (never hardcoded)
   autoAnalyze: boolean;
   lightMode: boolean;
+  darkMode?: boolean;
   notifications: boolean;
   theme: "dark" | "light" | "system";
 }

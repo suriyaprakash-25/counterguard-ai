@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from backend.database.engine import get_db_session
 from backend.models.investigation import InvestigationModel
 from backend.schemas.browser import BrowserAnalysisRequest, BrowserAnalysisResponse
+from backend.services.threat_scoring_engine import threat_scoring_engine
 
 logger = logging.getLogger("counterguard.browser_api")
 
@@ -36,158 +37,43 @@ def analyze_browser_product_card(  # noqa: C901
     )
 
     try:
-        # 1. Evaluate Seller Trust Score (0-100)
-        seller_trust = 92.0
-        findings = []
-
-        if (
-            not request.seller
-            or "unverified" in request.seller.lower()
-            or "unknown" in request.seller.lower()
-        ):
-            seller_trust -= 35.0
-            findings.append(
-                "Unverified seller identity — seller credentials not registered in brand registry"
-            )
-        elif (
-            "official" in request.seller.lower()
-            or "appario" in request.seller.lower()
-            or "retailnet" in request.seller.lower()
-        ):
-            seller_trust += 5.0
-            findings.append("Seller matched verified authorized distributor database")
-
-        if request.rating is not None and request.rating < 3.8:
-            seller_trust -= 15.0
-            findings.append(
-                f"Low seller customer rating detected ({request.rating}/5.0)"
-            )
-
-        seller_trust = max(10.0, min(100.0, seller_trust))
-
-        # 2. Compute Threat Risk Score (0-100)
-        risk_score = 15.0  # Base safe score
-
-        if seller_trust < 60.0:
-            risk_score += 45.0
-        elif seller_trust < 80.0:
-            risk_score += 25.0
-
-        if request.price <= 0:
-            risk_score += 30.0
-            findings.append("Price anomaly detected — missing or zero price listed")
-        elif request.price < 500:
-            # Low price product
-            risk_score += 15.0
-            findings.append(
-                f"Price anomaly — listed price (₹{request.price:.2f}) is significantly below brand MSRP"
-            )
-
-        if (
-            "counterfeit" in request.title.lower()
-            or "replica" in request.title.lower()
-            or "copy" in request.title.lower()
-        ):
-            risk_score += 50.0
-            findings.append("High-risk keyword match in product title")
-
-        risk_score = max(5.0, min(99.0, risk_score))
-
-        # 3. Classify Threat Level & Recommendation
-        if risk_score >= 75.0:
-            threat_level = "CRITICAL"
-            recommendation = "IMMEDIATE TAKEDOWN RECOMMENDED — High probability of counterfeit or unauthorized replica listing."
-        elif risk_score >= 50.0:
-            threat_level = "HIGH"
-            recommendation = "CEASE & DESIST ADVISORY — Suspicious price variance and unverified seller entity."
-        elif risk_score >= 30.0:
-            threat_level = "MEDIUM"
-            recommendation = "MONITOR SELLER — Unverified seller listing; perform periodic test purchase."
-        else:
-            threat_level = "SAFE"
-            recommendation = "CLEAN AUTHENTIC LISTING — Verified seller credentials and authorized catalog match."
-
-        if not findings:
-            findings.append(
-                "Product title, price, and seller domain match authorized brand registry"
-            )
-            findings.append("No active counterfeit risk signals detected")
-
-        # 4. Fraud Ring & Graph Match Heuristics
-        fraud_ring = (
-            f"Cluster #FR-{hash(request.seller) % 900 + 100}"
-            if risk_score >= 50.0
-            else None
+        eval_result = threat_scoring_engine.evaluate_browser_product_card(
+            title=request.title,
+            seller=request.seller,
+            price=request.price,
+            currency=request.currency or "INR",
+            url=request.url,
+            marketplace=request.marketplace,
+            rating=request.rating,
+            review_count=request.review_count,
+            brand=request.brand,
         )
-        historical_matches = 4 if risk_score >= 70.0 else 1 if risk_score >= 40.0 else 0
-        evidence_count = 5 if risk_score >= 50.0 else 2
 
-        brand_name = request.brand or "Sony"
-        trusted_alternatives = [
-            {
-                "seller_name": "Appario Retail Pvt Ltd (Official Distributor)",
-                "marketplace": "Amazon",
-                "price": max(999.0, request.price * 1.05)
-                if request.price > 0
-                else 24990.0,
-                "currency": "INR",
-                "trust_score": 98.5,
-                "availability": "In Stock",
-                "is_best_recommendation": True,
-                "url": f"https://www.amazon.in/s?k={brand_name}",
-            },
-            {
-                "seller_name": "Treasure Troll Retail (Authorized Partner)",
-                "marketplace": "Flipkart",
-                "price": max(999.0, request.price * 1.02)
-                if request.price > 0
-                else 24500.0,
-                "currency": "INR",
-                "trust_score": 96.0,
-                "availability": "Only 3 Left",
-                "is_best_recommendation": False,
-                "url": f"https://www.flipkart.com/search?q={brand_name}",
-            },
-            {
-                "seller_name": "Myntra Direct Authorized Store",
-                "marketplace": "Myntra",
-                "price": max(999.0, request.price * 1.08)
-                if request.price > 0
-                else 25990.0,
-                "currency": "INR",
-                "trust_score": 94.2,
-                "availability": "In Stock",
-                "is_best_recommendation": False,
-                "url": f"https://www.myntra.com/{brand_name.lower()}",
-            },
-        ]
-
-        inv_id = f"inv-{uuid.uuid4().hex[:8]}"
-        ev_id = f"ev-{uuid.uuid4().hex[:12]}"
-
-        # Log trace
         logger.info(
             f"[BrowserAPI] Analysis completed for '{request.title[:30]}...': "
-            f"Risk={risk_score:.1f} ({threat_level}), SellerTrust={seller_trust:.1f}, Inv={inv_id}"
+            f"Risk={eval_result['risk_score']} ({eval_result['threat_level']}), "
+            f"SellerTrust={eval_result['seller_trust']}, Inv={eval_result['investigation_id']}"
         )
 
         return BrowserAnalysisResponse(
-            risk_score=round(risk_score, 1),
-            threat_level=threat_level,
-            seller_trust=round(seller_trust, 1),
-            recommendation=recommendation,
-            investigation_id=inv_id,
-            evidence_id=ev_id,
-            evidence_count=evidence_count,
-            fraud_ring=fraud_ring,
-            historical_matches=historical_matches,
-            trusted_alternatives=trusted_alternatives,
-            findings=findings,
-            analyzed_at=datetime.now(timezone.utc).isoformat(),
+            risk_score=eval_result["risk_score"],
+            threat_level=eval_result["threat_level"],
+            seller_trust=eval_result["seller_trust"],
+            recommendation=eval_result["recommendation"],
+            verdict=eval_result["verdict"],
+            investigation_id=eval_result["investigation_id"],
+            evidence_id=eval_result["evidence_id"],
+            evidence_count=eval_result["evidence_count"],
+            fraud_ring=eval_result["fraud_ring"],
+            historical_matches=eval_result["historical_matches"],
+            trusted_alternatives=eval_result["trusted_alternatives"],
+            findings=eval_result["findings"],
+            analyzed_at=eval_result["analyzed_at"],
         )
-
     except Exception as e:
-        logger.error(f"[BrowserAPI] Failed to analyze product card: {e}", exc_info=True)
+        logger.error(
+            f"[BrowserAPI] Threat scoring evaluation failed: {e}", exc_info=True
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Browser product analysis failed: {str(e)}",

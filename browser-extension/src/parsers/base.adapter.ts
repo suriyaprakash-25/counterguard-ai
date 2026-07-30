@@ -36,7 +36,7 @@ export abstract class BaseParserAdapter {
       }
       failedSelectors.push(`${fieldName}:${selector}`);
     }
-    ExtensionLogger.warn(`[${this.marketplaceName}] All selectors failed for field '${fieldName}'`);
+    ExtensionLogger.debug(`[${this.marketplaceName}] Field '${fieldName}' absent via selectors.`);
     return undefined;
   }
 

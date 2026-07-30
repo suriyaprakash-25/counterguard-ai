@@ -14,7 +14,7 @@ export class ExtensionMessagingService {
       if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
         chrome.runtime.sendMessage(message, (response: MessageResponse<R>) => {
           if (chrome.runtime.lastError) {
-            ExtensionLogger.warn("Messaging error:", chrome.runtime.lastError.message);
+            ExtensionLogger.debug("Messaging notice:", chrome.runtime.lastError.message);
             resolve({
               success: false,
               error: chrome.runtime.lastError.message,
@@ -38,7 +38,7 @@ export class ExtensionMessagingService {
       if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.sendMessage) {
         chrome.tabs.sendMessage(tabId, message, (response: MessageResponse<R>) => {
           if (chrome.runtime.lastError) {
-            ExtensionLogger.warn(`Tab messaging error for tab ${tabId}:`, chrome.runtime.lastError.message);
+            ExtensionLogger.debug(`Tab messaging notice for tab ${tabId}:`, chrome.runtime.lastError.message);
             resolve({
               success: false,
               error: chrome.runtime.lastError.message,

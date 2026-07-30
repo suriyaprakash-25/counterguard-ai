@@ -24,7 +24,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
       ExtensionLogger.debug(`Active tab changed to: ${tab.url}`);
     }
   } catch (err) {
-    ExtensionLogger.warn("Failed to inspect activated tab:", err);
+    ExtensionLogger.debug("Tab inspection notice:", err);
   }
 });
 

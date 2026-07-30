@@ -26,18 +26,25 @@ export interface PageMetadata {
 export interface SecurityAnalysisResult {
   candidateId?: string;
   marketplace: string;
+  productTitle?: string;
+  sellerName?: string;
   threatLevel: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "SAFE";
   threatScore: number; // 0 to 100
   sellerTrust?: number; // 0 to 100
   recommendation?: string;
   investigationId?: string;
   evidenceId?: string;
+  evidenceCount?: number;
+  fraudRing?: string;
+  historicalMatches?: number;
+  trustedAlternatives?: Array<{ name: string; url: string }>;
   verdict: string;
   matchedListingsCount: number;
   confidenceScore: number;
   analyzedAt: string;
   findings: string[];
 }
+
 
 
 export interface ExtensionState {

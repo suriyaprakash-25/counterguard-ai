@@ -3,7 +3,6 @@ import {
   Shield,
   Settings,
   Globe,
-  ExternalLink,
   Lock,
   Activity,
   AlertTriangle,
@@ -13,8 +12,13 @@ import {
   WifiOff,
   ChevronRight,
   Database,
-  Cpu,
-  Layers
+  RefreshCw,
+  FileDown,
+  PlusCircle,
+  ExternalLink,
+  Users,
+  ShieldCheck,
+  Zap,
 } from "lucide-react";
 import { useChromeStorage } from "../hooks/useChromeStorage";
 import { useActiveTab } from "../hooks/useActiveTab";
@@ -23,7 +27,6 @@ import { BackendHealthStatus, SecurityAnalysisResult } from "../types/extension"
 import { ChromeStorageService } from "../services/storage.service";
 import { DomExtractionEngine } from "../parsers";
 
-
 export function PopupPage() {
   const { settings } = useChromeStorage();
   const { page, loading: tabLoading } = useActiveTab();
@@ -31,19 +34,18 @@ export function PopupPage() {
   const [backendStatus, setBackendStatus] = useState<BackendHealthStatus>("CHECKING");
   const [analysis, setAnalysis] = useState<SecurityAnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [creatingInv, setCreatingInv] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Check backend health status on load
+  // Check Backend Health
   useEffect(() => {
-    async function checkBackend() {
-      setBackendStatus("CHECKING");
-      const health = await BackendApiClient.checkHealth(settings.backendUrl);
-      setBackendStatus(health.isOnline ? "ONLINE" : "OFFLINE");
-    }
-    checkBackend();
+    BackendApiClient.checkHealth(settings.backendUrl).then(({ isOnline }) => {
+      setBackendStatus(isOnline ? "ONLINE" : "OFFLINE");
+    });
   }, [settings.backendUrl]);
 
-  // Load existing analysis for active domain if available
+  // Load cached analysis
   useEffect(() => {
     if (page?.domain) {
       ChromeStorageService.getLastAnalysis(page.domain).then((prev) => {
@@ -52,6 +54,15 @@ export function PopupPage() {
     }
   }, [page?.domain]);
 
+  // Toast auto-clear
+  useEffect(() => {
+    if (!toastMsg) return;
+    const timer = setTimeout(() => setToastMsg(null), 3500);
+    return () => clearTimeout(timer);
+  }, [toastMsg]);
+
+
+  // Main Threat Inspection Handler
   const handleAnalyze = async () => {
     if (!page) return;
     setAnalyzing(true);
@@ -73,12 +84,18 @@ export function PopupPage() {
 
       const result: SecurityAnalysisResult = {
         marketplace: page.marketplaceName || page.domain,
+        productTitle: extractedCard.title,
+        sellerName: extractedCard.seller,
         threatLevel: backendResp.threat_level,
         threatScore: backendResp.risk_score,
         sellerTrust: backendResp.seller_trust,
         recommendation: backendResp.recommendation,
         investigationId: backendResp.investigation_id,
         evidenceId: backendResp.evidence_id,
+        evidenceCount: backendResp.evidence_count,
+        fraudRing: backendResp.fraud_ring || undefined,
+        historicalMatches: backendResp.historical_matches,
+        trustedAlternatives: backendResp.trusted_alternatives,
         verdict: backendResp.threat_level === "CRITICAL" || backendResp.threat_level === "HIGH"
           ? "SUSPICIOUS COUNTERFEIT RISK"
           : backendResp.threat_level === "MEDIUM"
@@ -101,6 +118,33 @@ export function PopupPage() {
     }
   };
 
+  // Button Handlers
+  const handleCreateInvestigation = async () => {
+    if (!analysis && !page) return;
+    setCreatingInv(true);
+    const query = analysis?.productTitle || page?.title || page?.domain || "Target Product";
+    const res = await BackendApiClient.createInvestigation(settings.backendUrl, query);
+    setCreatingInv(false);
+
+    if (res.success) {
+      setToastMsg(`✅ Investigation ${res.id || "created"} logged in CounterGuard!`);
+    } else {
+      setErrorMsg(`Failed to create investigation: ${res.message}`);
+    }
+  };
+
+  const handleExportReport = () => {
+    if (!analysis) return;
+    const reportData = JSON.stringify(analysis, null, 2);
+    const blob = new Blob([reportData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `counterguard-report-${analysis.investigationId || "analysis"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setToastMsg("📥 Security Report downloaded successfully.");
+  };
 
   const handleOpenSettings = () => {
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.openOptionsPage) {
@@ -115,48 +159,63 @@ export function PopupPage() {
   };
 
   return (
-    <div className="w-[380px] bg-slate-950 text-white min-h-[500px] flex flex-col font-sans border border-slate-800 shadow-2xl">
+    <div className="w-[420px] bg-slate-950 text-white min-h-[580px] flex flex-col font-sans border border-slate-800 shadow-2xl">
+      {/* ── Toast Notification Banner ────────────────────────────────────── */}
+      {toastMsg && (
+        <div className="bg-purple-600 text-white px-3 py-2 text-xs font-semibold flex items-center justify-between shadow-lg animate-fadeIn">
+          <span>{toastMsg}</span>
+          <button onClick={() => setToastMsg(null)} className="text-white/80 hover:text-white font-bold text-sm">×</button>
+        </div>
+      )}
+
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <header className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+      <header className="p-3.5 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between backdrop-blur">
         <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shadow-lg shadow-purple-900/20">
-            <Shield className="h-5 w-5" />
+          <div className="h-8 w-8 rounded-xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shadow-lg shadow-purple-900/20">
+            <Shield className="h-4 w-4" />
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
-              CounterGuard <span className="text-[10px] bg-purple-950 text-purple-300 font-mono border border-purple-800 px-1.5 py-0.5 rounded">v1.0.0</span>
+            <h1 className="text-xs font-bold tracking-tight text-white flex items-center gap-1.5">
+              CounterGuard <span className="text-[9px] bg-purple-950 text-purple-300 font-mono border border-purple-800/80 px-1.5 py-0.5 rounded">SOC v1.0</span>
             </h1>
-            <p className="text-[10px] text-slate-400 font-mono">Enterprise Brand Intelligence</p>
+            <p className="text-[9px] text-slate-400 font-mono">Enterprise Brand Protection Agent</p>
           </div>
         </div>
 
-        <button
-          onClick={handleOpenSettings}
-          className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-          title="Open Extension Settings"
-        >
-          <Settings className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+            title="Refresh Inspection"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${analyzing ? "animate-spin text-purple-400" : ""}`} />
+          </button>
+          <button
+            onClick={handleOpenSettings}
+            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+            title="Extension Settings"
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </header>
 
-      {/* ── Status Bar ─────────────────────────────────────────────────── */}
-      <div className="px-4 py-2 bg-slate-900/40 border-b border-slate-800/60 flex items-center justify-between text-[11px] font-mono">
-        <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-slate-400">Extension:</span>
-          <span className="text-emerald-400 font-bold">ACTIVE</span>
-        </div>
-
+      {/* ── Backend Status Bar ───────────────────────────────────────────── */}
+      <div className="px-3.5 py-1.5 bg-slate-900/60 border-b border-slate-800/80 flex items-center justify-between text-[10px] font-mono">
+        <span className="text-slate-400 flex items-center gap-1">
+          <Activity className="h-3 w-3 text-purple-400" /> Backend Engine:
+        </span>
         <div className="flex items-center gap-1.5">
           {backendStatus === "ONLINE" ? (
             <>
               <Wifi className="h-3 w-3 text-emerald-400" />
-              <span className="text-emerald-400 font-bold">BACKEND ONLINE</span>
+              <span className="text-emerald-400 font-bold">FASTAPI ONLINE (Port 8000)</span>
             </>
           ) : backendStatus === "OFFLINE" ? (
             <>
               <WifiOff className="h-3 w-3 text-red-400" />
-              <span className="text-red-400 font-bold">BACKEND OFFLINE</span>
+              <span className="text-red-400 font-bold">BACKEND OFFLINE (Local Mode)</span>
             </>
           ) : (
             <span className="text-slate-400">Pinging backend...</span>
@@ -164,13 +223,13 @@ export function PopupPage() {
         </div>
       </div>
 
-      {/* ── Body ────────────────────────────────────────────────────────── */}
-      <main className="flex-1 p-4 space-y-4">
-        {/* Active Tab Info Card */}
-        <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase tracking-wider font-mono">
+      {/* ── Main Body ────────────────────────────────────────────────────── */}
+      <main className="flex-1 p-3.5 space-y-3 overflow-y-auto max-h-[460px]">
+        {/* Active Target Site Card */}
+        <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between text-[9px] text-slate-400 uppercase tracking-wider font-mono">
             <span className="flex items-center gap-1">
-              <Globe className="h-3 w-3 text-purple-400" /> Active Target Site
+              <Globe className="h-3 w-3 text-purple-400" /> Target Website & Product
             </span>
             {page?.isSecure && (
               <span className="flex items-center gap-1 text-emerald-400 font-semibold">
@@ -182,20 +241,19 @@ export function PopupPage() {
           {tabLoading ? (
             <div className="h-10 animate-pulse bg-slate-800/60 rounded" />
           ) : page ? (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2">
-                {page.faviconUrl && (
-                  <img src={page.faviconUrl} alt="" className="h-4 w-4 rounded shrink-0" />
-                )}
-                <h2 className="text-xs font-bold text-white truncate max-w-[280px]">
+                {page.faviconUrl && <img src={page.faviconUrl} alt="" className="h-4 w-4 rounded shrink-0" />}
+                <h2 className="text-xs font-bold text-white truncate max-w-[320px]">
                   {page.title}
                 </h2>
               </div>
-              <p className="text-[11px] font-mono text-purple-300 truncate">
+              <p className="text-[10px] font-mono text-purple-300 truncate">
                 {page.domain}
               </p>
+
               {page.isSupportedMarketplace && page.detection && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
                   <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/60">
                     {page.marketplaceName || page.detection.marketplace}
                   </span>
@@ -220,25 +278,19 @@ export function PopupPage() {
                       FK ID: {page.detection.flipkartId}
                     </span>
                   )}
-                  {page.detection.productId && !page.detection.asin && !page.detection.flipkartId && (
-                    <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-indigo-800/60">
-                      ID: {page.detection.productId}
-                    </span>
-                  )}
                 </div>
               )}
-
             </div>
           ) : (
             <p className="text-xs text-slate-400">No active website tab detected.</p>
           )}
         </div>
 
-        {/* Action Button */}
+        {/* Primary Threat Inspection Button */}
         <button
           onClick={handleAnalyze}
           disabled={analyzing || !page}
-          className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 transition-all hover:scale-[1.01]"
+          className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 transition-all hover:scale-[1.01]"
         >
           {analyzing ? (
             <>
@@ -254,78 +306,113 @@ export function PopupPage() {
         </button>
 
         {errorMsg && (
-          <div className="p-2.5 rounded-lg bg-red-950/60 border border-red-800/60 text-xs text-red-300 text-center">
+          <div className="p-2.5 rounded-lg bg-red-950/60 border border-red-800/60 text-xs text-red-300 text-center font-mono">
             {errorMsg}
           </div>
         )}
 
-        {/* Analysis Results Card */}
+        {/* ── Enterprise SOC Threat Analysis Card ────────────────────────── */}
         {analysis && (
-          <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3 animate-fadeIn">
-            <div className="flex items-center justify-between">
+          <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 space-y-3 animate-fadeIn">
+            {/* Threat Verdict & Risk Gauge */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                {analysis.threatLevel === "HIGH" || analysis.threatLevel === "CRITICAL" ? (
-                  <AlertTriangle className="h-4 w-4 text-red-400" />
+                {analysis.threatLevel === "CRITICAL" || analysis.threatLevel === "HIGH" ? (
+                  <AlertTriangle className="h-4 w-4 text-red-400 animate-pulse" />
                 ) : analysis.threatLevel === "MEDIUM" ? (
                   <Activity className="h-4 w-4 text-amber-400" />
                 ) : (
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                 )}
-                <span className="text-xs font-bold text-white uppercase font-mono">
-                  {analysis.verdict}
-                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-white uppercase font-mono block">
+                    {analysis.verdict}
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-mono">
+                    Marketplace: {analysis.marketplace}
+                  </span>
+                </div>
               </div>
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono ${
-                  analysis.threatLevel === "HIGH"
-                    ? "bg-red-500/20 text-red-300 border border-red-500/40"
-                    : analysis.threatLevel === "MEDIUM"
-                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                    : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                }`}
-              >
-                Score: {analysis.threatScore}/100
-              </span>
+
+              <div className="text-right">
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono inline-block ${
+                    analysis.threatLevel === "CRITICAL" || analysis.threatLevel === "HIGH"
+                      ? "bg-red-500/20 text-red-300 border border-red-500/40"
+                      : analysis.threatLevel === "MEDIUM"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                  }`}
+                >
+                  {analysis.threatLevel}
+                </span>
+                <div className="text-[11px] font-bold text-white font-mono mt-0.5">
+                  Risk: {analysis.threatScore}/100
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-[10px] font-mono bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-slate-300">
-              <div>
-                <span className="text-slate-500 block text-[9px]">Seller Trust</span>
+            {/* 6-Grid SOC Telemetry Dashboard */}
+            <div className="grid grid-cols-3 gap-2 text-[10px] font-mono">
+              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                <span className="text-slate-500 block text-[8px] uppercase">Seller Trust</span>
                 <strong className={analysis.sellerTrust && analysis.sellerTrust >= 70 ? "text-emerald-400 text-xs" : "text-amber-400 text-xs"}>
                   {analysis.sellerTrust ?? 50}%
                 </strong>
               </div>
-              <div>
-                <span className="text-slate-500 block text-[9px]">Confidence</span>
+
+              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                <span className="text-slate-500 block text-[8px] uppercase">Evidence Count</span>
+                <strong className="text-blue-400 text-xs flex items-center gap-1">
+                  <Database className="h-3 w-3" /> {analysis.evidenceCount || 1} SHA-256
+                </strong>
+              </div>
+
+              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                <span className="text-slate-500 block text-[8px] uppercase">Fraud Ring</span>
+                <strong className={analysis.fraudRing ? "text-red-400 text-xs truncate block" : "text-slate-400 text-xs"}>
+                  {analysis.fraudRing || "Clean"}
+                </strong>
+              </div>
+
+              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                <span className="text-slate-500 block text-[8px] uppercase">Graph Matches</span>
+                <strong className="text-purple-400 text-xs">{analysis.historicalMatches || 0} Cases</strong>
+              </div>
+
+              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                <span className="text-slate-500 block text-[8px] uppercase">Confidence</span>
                 <strong className="text-emerald-400 text-xs">{analysis.confidenceScore}%</strong>
+              </div>
+
+              <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                <span className="text-slate-500 block text-[8px] uppercase">Time</span>
+                <span className="text-slate-300 text-[9px] truncate block">{analysis.analyzedAt}</span>
               </div>
             </div>
 
+            {/* Actionable Security Recommendation */}
             {analysis.recommendation && (
-              <div className="p-2 rounded bg-purple-950/40 border border-purple-800/60 text-[10px] font-mono text-purple-200">
-                <span className="font-bold block text-[9px] text-purple-400 uppercase">Recommendation</span>
+              <div className="p-2.5 rounded-lg bg-purple-950/40 border border-purple-800/60 text-[10px] font-mono text-purple-200">
+                <span className="font-bold flex items-center gap-1 text-[9px] text-purple-400 uppercase tracking-wider mb-0.5">
+                  <Zap className="h-3 w-3" /> Security Recommendation
+                </span>
                 {analysis.recommendation}
               </div>
             )}
 
+            {/* IDs Traceability Bar */}
             {(analysis.investigationId || analysis.evidenceId) && (
-              <div className="flex items-center gap-1.5 text-[9px] font-mono text-slate-400">
-                {analysis.investigationId && (
-                  <span className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
-                    ID: {analysis.investigationId}
-                  </span>
-                )}
-                {analysis.evidenceId && (
-                  <span className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 truncate max-w-[170px]">
-                    EV: {analysis.evidenceId}
-                  </span>
-                )}
+              <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 bg-slate-950 p-2 rounded border border-slate-800">
+                <span className="truncate max-w-[170px]">INV: {analysis.investigationId}</span>
+                <span className="truncate max-w-[170px]">EV: {analysis.evidenceId}</span>
               </div>
             )}
 
+            {/* Key Risk Findings */}
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-400 uppercase">Key Security Findings</span>
-              <ul className="space-y-1 text-[11px] text-slate-300">
+              <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block">Key Risk Findings</span>
+              <ul className="space-y-1 text-[10px] text-slate-300">
                 {analysis.findings.map((f, i) => (
                   <li key={i} className="flex items-start gap-1.5">
                     <span className="text-purple-400 font-bold">•</span>
@@ -335,19 +422,65 @@ export function PopupPage() {
               </ul>
             </div>
 
+            {/* Trusted Authorized Seller Alternatives */}
+            {analysis.trustedAlternatives && analysis.trustedAlternatives.length > 0 && (
+              <div className="space-y-1 pt-1 border-t border-slate-800">
+                <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                  <ShieldCheck className="h-3 w-3 text-emerald-400" /> Trusted Brand Sellers
+                </span>
+                <div className="space-y-1">
+                  {analysis.trustedAlternatives.map((alt, i) => (
+                    <a
+                      key={i}
+                      href={alt.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between p-1.5 rounded bg-slate-950 hover:bg-slate-800 text-[10px] font-mono text-emerald-300 border border-slate-800 transition-colors"
+                    >
+                      <span className="truncate">{alt.name}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0 text-slate-400" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── SOC Action Toolbar Buttons ───────────────────────────────── */}
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={handleCreateInvestigation}
+                disabled={creatingInv}
+                className="py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold text-[10px] font-mono flex items-center justify-center gap-1.5 shadow transition-colors"
+              >
+                {creatingInv ? (
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-white/30 border-t-white" />
+                ) : (
+                  <PlusCircle className="h-3.5 w-3.5" />
+                )}
+                <span>Log Investigation</span>
+              </button>
+
+              <button
+                onClick={handleExportReport}
+                className="py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px] font-mono flex items-center justify-center gap-1.5 border border-slate-700 transition-colors"
+              >
+                <FileDown className="h-3.5 w-3.5 text-blue-400" />
+                <span>Export Report</span>
+              </button>
+            </div>
           </div>
         )}
       </main>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <footer className="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-[11px]">
+      <footer className="p-2.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-[10px]">
         <button
           onClick={handleOpenDashboard}
-          className="flex items-center gap-1 text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+          className="flex items-center gap-1 text-purple-400 hover:text-purple-300 font-semibold transition-colors font-mono"
         >
-          Open Enterprise Command Center <ChevronRight className="h-3 w-3" />
+          Open Command Center <ChevronRight className="h-3 w-3" />
         </button>
-        <span className="text-slate-500 font-mono text-[9px]">Manifest V3</span>
+        <span className="text-slate-500 font-mono text-[9px]">Manifest V3 SOC</span>
       </footer>
     </div>
   );

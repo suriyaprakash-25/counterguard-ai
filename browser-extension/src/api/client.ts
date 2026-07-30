@@ -160,6 +160,10 @@ export class BackendApiClient {
       recommendation: "DEGRADED CONNECTION — Backend unreachable. Displaying cached heuristic risk score.",
       investigation_id: `inv-offline-${Date.now().toString(36)}`,
       evidence_id: `ev-offline-${Date.now().toString(36)}`,
+      evidence_count: 1,
+      fraud_ring: undefined,
+      historical_matches: 0,
+      trusted_alternatives: [],
       findings: [
         "Backend service timeout or connection refusal",
         "Executing extension local fallback risk analysis heuristics"
@@ -167,5 +171,34 @@ export class BackendApiClient {
       analyzed_at: new Date().toISOString(),
     };
   }
+
+  /**
+   * Create Investigation — Register live investigation in CounterGuard
+   */
+  static async createInvestigation(
+    baseUrl: string,
+    query: string
+  ): Promise<{ success: boolean; id?: string; message?: string }> {
+    const url = `${baseUrl.replace(/\/$/, "")}/api/v1/investigations`;
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ query: query, depth: "standard" }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        return { success: true, id: data.id || data.investigation_id };
+      }
+      return { success: false, message: `HTTP ${resp.status}` };
+    } catch (err: any) {
+      ExtensionLogger.error("Failed to create investigation:", err);
+      return { success: false, message: err.message };
+    }
+  }
 }
+
 

@@ -42,7 +42,12 @@ export interface BrowserAnalysisResponse {
   recommendation: string;
   investigation_id: string;
   evidence_id: string;
+  evidence_count: number;
+  fraud_ring?: string;
+  historical_matches: number;
+  trusted_alternatives: Array<{ name: string; url: string }>;
   findings: string[];
   analyzed_at: string;
 }
+
 

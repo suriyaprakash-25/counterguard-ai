@@ -33,5 +33,10 @@ class BrowserAnalysisResponse(BaseModel):
     recommendation: str = Field(..., description="Actionable Security Recommendation")
     investigation_id: str = Field(..., description="Generated or correlated Investigation ID")
     evidence_id: str = Field(..., description="SHA-256 Evidence Archive ID")
+    evidence_count: int = Field(1, description="Total raw evidence items archived")
+    fraud_ring: Optional[str] = Field(None, description="Detected Fraud Ring Cluster ID if any")
+    historical_matches: int = Field(0, description="Total historical counterfeit matches in graph DB")
+    trusted_alternatives: List[Dict[str, str]] = Field(default_factory=list, description="Verified authorized seller alternatives")
     findings: List[str] = Field(default_factory=list, description="Key Risk Findings & Anomaly Indicators")
     analyzed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+

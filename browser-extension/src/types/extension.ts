@@ -1,6 +1,4 @@
-/**
- * extension.ts — Strict TypeScript type definitions for CounterGuard Chrome Extension
- */
+import { MarketplaceDetectionResult } from "./marketplace";
 
 export interface ExtensionSettings {
   backendUrl: string;
@@ -14,6 +12,7 @@ export type ConnectionStatus = "ACTIVE" | "IDLE" | "ERROR" | "CONNECTING";
 export type BackendHealthStatus = "ONLINE" | "OFFLINE" | "CHECKING";
 
 export interface PageMetadata {
+
   url: string;
   domain: string;
   title: string;
@@ -21,6 +20,7 @@ export interface PageMetadata {
   isSupportedMarketplace: boolean;
   marketplaceName?: string;
   isSecure: boolean;
+  detection?: MarketplaceDetectionResult;
 }
 
 export interface SecurityAnalysisResult {

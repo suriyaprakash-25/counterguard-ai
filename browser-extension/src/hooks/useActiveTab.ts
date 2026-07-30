@@ -1,13 +1,6 @@
-/**
- * useActiveTab.ts — Active Tab URL & Metadata inspector hook
- */
-
 import { useState, useEffect } from "react";
 import { PageMetadata } from "../types/extension";
-
-const SUPPORTED_MARKETPLACES = [
-  "amazon", "flipkart", "tradeindia", "myntra", "meesho", "ajio", "ebay", "aliexpress"
-];
+import { MarketplaceDetector } from "../services/marketplaceDetector.service";
 
 export function useActiveTab() {
   const [page, setPage] = useState<PageMetadata | null>(null);
@@ -23,17 +16,17 @@ export function useActiveTab() {
           try {
             const urlObj = new URL(activeTab.url);
             const host = urlObj.hostname.replace(/^www\./, "");
-            
-            const matchedMp = SUPPORTED_MARKETPLACES.find(mp => host.toLowerCase().includes(mp));
-            
+            const detection = MarketplaceDetector.detect(activeTab.url);
+
             setPage({
               url: activeTab.url,
               domain: host,
               title: activeTab.title || host,
               faviconUrl: activeTab.favIconUrl,
-              isSupportedMarketplace: Boolean(matchedMp),
-              marketplaceName: matchedMp ? matchedMp.charAt(0).toUpperCase() + matchedMp.slice(1) : undefined,
+              isSupportedMarketplace: detection.isMarketplace,
+              marketplaceName: detection.isMarketplace ? detection.marketplace : undefined,
               isSecure: urlObj.protocol === "https:",
+              detection: detection,
             });
           } catch {
             setPage(null);
@@ -43,14 +36,17 @@ export function useActiveTab() {
       });
     } else {
       // Mock fallback for browser dev environment
+      const mockUrl = "https://www.amazon.in/dp/B0CX237A12";
+      const detection = MarketplaceDetector.detect(mockUrl);
       setPage({
-        url: "https://www.amazon.in/dp/B0CX237A12",
+        url: mockUrl,
         domain: "amazon.in",
         title: "Sony WH-1000XM5 Wireless Headphones — Amazon.in",
         faviconUrl: "https://www.amazon.in/favicon.ico",
         isSupportedMarketplace: true,
         marketplaceName: "Amazon",
         isSecure: true,
+        detection: detection,
       });
       setLoading(false);
     }
@@ -58,3 +54,4 @@ export function useActiveTab() {
 
   return { page, loading };
 }
+

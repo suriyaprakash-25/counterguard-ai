@@ -196,11 +196,40 @@ export function PopupPage() {
               <p className="text-[11px] font-mono text-purple-300 truncate">
                 {page.domain}
               </p>
-              {page.isSupportedMarketplace && (
-                <span className="inline-block text-[9px] font-mono font-semibold px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/60 mt-1">
-                  Monitored Marketplace ({page.marketplaceName})
-                </span>
+              {page.isSupportedMarketplace && page.detection && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/60">
+                    {page.marketplaceName || page.detection.marketplace}
+                  </span>
+                  <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded ${
+                    page.detection.pageType === "PRODUCT"
+                      ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                      : page.detection.pageType === "SEARCH"
+                      ? "bg-blue-950 text-blue-300 border border-blue-800"
+                      : page.detection.pageType === "SELLER"
+                      ? "bg-amber-950 text-amber-300 border border-amber-800"
+                      : "bg-slate-800 text-slate-300 border border-slate-700"
+                  }`}>
+                    Type: {page.detection.pageType}
+                  </span>
+                  {page.detection.asin && (
+                    <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-800/60">
+                      ASIN: {page.detection.asin}
+                    </span>
+                  )}
+                  {page.detection.flipkartId && (
+                    <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-blue-300 border border-blue-800/60">
+                      FK ID: {page.detection.flipkartId}
+                    </span>
+                  )}
+                  {page.detection.productId && !page.detection.asin && !page.detection.flipkartId && (
+                    <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-indigo-800/60">
+                      ID: {page.detection.productId}
+                    </span>
+                  )}
+                </div>
               )}
+
             </div>
           ) : (
             <p className="text-xs text-slate-400">No active website tab detected.</p>

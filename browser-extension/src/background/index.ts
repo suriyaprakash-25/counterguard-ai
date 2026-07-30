@@ -1,11 +1,8 @@
-/**
- * background/index.ts — Manifest V3 Background Service Worker
- * Handles initialization, API communication, tab listeners, runtime messaging, and storage synchronization.
- */
-
 import { ExtensionLogger } from "../services/logger.service";
 import { ChromeStorageService, DEFAULT_SETTINGS } from "../services/storage.service";
 import { BackendApiClient } from "../api/client";
+import { MarketplaceDetector } from "../services/marketplaceDetector.service";
+import { AutoAnalyzer } from "../services/autoAnalyzer.service";
 import { ExtensionMessage, MessageResponse, SecurityAnalysisResult, ExtensionSettings } from "../types/extension";
 
 ExtensionLogger.info("Background Service Worker initializing...");
@@ -31,22 +28,28 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   }
 });
 
-// 3. Tab Update Listener
+// 3. Tab Update Listener with AutoAnalyzer Debouncing & Deduplication
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url && tab.url.startsWith("http")) {
-    ExtensionLogger.debug(`Tab ${tabId} updated: ${tab.url}`);
+    const settings = await ChromeStorageService.getSettings();
     
     // Auto-analyze if enabled in settings
-    const settings = await ChromeStorageService.getSettings();
     if (settings.autoAnalyze) {
-      const urlObj = new URL(tab.url);
-      const domain = urlObj.hostname.replace(/^www\./, "");
+      const detection = MarketplaceDetector.detect(tab.url);
       
-      // Perform background analysis check
-      analyzePageThreat(settings.backendUrl, domain, tab.title || domain);
+      if (detection.isMarketplace && AutoAnalyzer.shouldAnalyze(tab.url)) {
+        AutoAnalyzer.debounce(tab.url, async () => {
+          ExtensionLogger.info(`[AutoAnalyzer] Triggering background auto-analysis for ${tab.url}`);
+          const urlObj = new URL(tab.url!);
+          const domain = urlObj.hostname.replace(/^www\./, "");
+          const result = await analyzePageThreat(settings.backendUrl, domain, tab.title || domain);
+          await AutoAnalyzer.setCachedResult(tab.url!, domain, result);
+        });
+      }
     }
   }
 });
+
 
 // 4. Runtime Message Listener
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {

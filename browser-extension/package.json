@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && vite build --config vite.content.config.ts",
+    "build": "tsc --noEmit && vite build && vite build --config vite.background.config.ts && vite build --config vite.content.config.ts",
     "build:main": "vite build",
+    "build:background": "vite build --config vite.background.config.ts",
     "build:content": "vite build --config vite.content.config.ts",
     "check-types": "tsc --noEmit",
     "test": "vitest run",

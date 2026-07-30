@@ -81,27 +81,11 @@ export default defineConfig({
       input: {
         popup:   resolve(__dirname, 'src/popup/index.html'),
         options: resolve(__dirname, 'src/options/index.html'),
-        background: resolve(__dirname, 'src/background/index.ts'),
-        // content script is built separately in vite.content.config.ts as IIFE
       },
       output: {
-        // Ensure entry files go to correct locations
-        entryFileNames: (chunkInfo) => {
-          if (chunkInfo.name === 'background') return 'background.js';
-          return 'assets/js/[name]-[hash].js';
-        },
+        entryFileNames: 'assets/js/[name]-[hash].js',
         chunkFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // DO NOT use manualChunks that generates empty chunks — simplify to just vendor split
-        manualChunks(id) {
-          // Vendor: react, react-dom, lucide-react etc → one shared vendor chunk
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-          // Extension services shared between popup + background
-          if (id.includes('/src/services/')) return 'ext-services';
-          if (id.includes('/src/api/'))      return 'ext-api';
-        },
       },
     },
   },

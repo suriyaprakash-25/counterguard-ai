@@ -6,7 +6,7 @@
  * - Evidence Archive Inspector
  * - Real-time change detection feed
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Button } from '../../components/common/Button';
@@ -430,6 +430,45 @@ function ArchiveInspector() {
   );
 }
 
+/* ─── Live Watchlist Countdown Component ───────────────────────────────── */
+
+function WatchlistCountdown({ nextRun }: { nextRun?: string }) {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(() => {
+    if (!nextRun) return null;
+    const targetMs = new Date(nextRun).getTime();
+    if (isNaN(targetMs)) return null;
+    return Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+  });
+
+  useEffect(() => {
+    if (!nextRun) return;
+    const targetMs = new Date(nextRun).getTime();
+    if (isNaN(targetMs)) return;
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [nextRun]);
+
+  if (secondsLeft === null) return null;
+
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = secondsLeft % 60;
+  const formattedTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+  return (
+    <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-[10px] flex items-center gap-1">
+      <Clock className="h-3 w-3 text-blue-500 animate-pulse" />
+      in {formattedTime} ({new Date(nextRun!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+    </span>
+  );
+}
+
 /* ─── Main Dashboard Component ──────────────────────────────────────────── */
 
 export default function MonitoringDashboard() {
@@ -471,11 +510,13 @@ export default function MonitoringDashboard() {
   });
 
   const handleExportCSV = () => {
-    window.open(endpoints.export.investigations + '?format=csv', '_blank');
+    const baseUrl = apiClient.defaults.baseURL || 'http://localhost:8000';
+    window.open(`${baseUrl}${endpoints.export.investigations}?format=csv`, '_blank');
   };
 
   const handleExportHealth = () => {
-    window.open(endpoints.export.providerHealth, '_blank');
+    const baseUrl = apiClient.defaults.baseURL || 'http://localhost:8000';
+    window.open(`${baseUrl}${endpoints.export.providerHealth}`, '_blank');
   };
 
   const handleCreated = () => {
@@ -677,12 +718,10 @@ export default function MonitoringDashboard() {
                       <span>Auto Swarms:</span>
                       <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{job.investigations_triggered}</span>
                     </div>
-                    {job.next_run && (
-                      <div className="flex justify-between">
+                    {job.next_run && job.status !== 'PAUSED' && (
+                      <div className="flex justify-between items-center">
                         <span>Next Run:</span>
-                        <span className="font-mono font-semibold text-blue-600 dark:text-blue-400 text-[10px]">
-                          {new Date(job.next_run).toLocaleTimeString()}
-                        </span>
+                        <WatchlistCountdown nextRun={job.next_run} />
                       </div>
                     )}
                   </div>

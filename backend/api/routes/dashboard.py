@@ -1,17 +1,15 @@
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from backend.database.engine import get_db_session
 from backend.database.repositories.dashboard_repo import DashboardRepository
 from backend.dependencies import neo4j_client
-from backend.infrastructure.graph.neo4j_client import Neo4jClient
+from backend.models.alert import AlertModel
 from backend.models.investigation import InvestigationModel
 from backend.models.report import ReportModel
-from backend.models.alert import AlertModel
 from backend.services.dashboard_service import DashboardService
 
 router = APIRouter(prefix="/dashboard")
@@ -66,14 +64,18 @@ def get_recent_activity(session: Session = Depends(get_db_session)):
     )
     items = []
     for inv in investigations:
-        items.append({
-            "id": inv.id,
-            "type": "investigation",
-            "status": inv.status,
-            "marketplace": inv.marketplace,
-            "listing_url": inv.listing_url,
-            "timestamp": inv.updated_at.isoformat() if isinstance(inv.updated_at, datetime) else str(inv.updated_at),
-        })
+        items.append(
+            {
+                "id": inv.id,
+                "type": "investigation",
+                "status": inv.status,
+                "marketplace": inv.marketplace,
+                "listing_url": inv.listing_url,
+                "timestamp": inv.updated_at.isoformat()
+                if isinstance(inv.updated_at, datetime)
+                else str(inv.updated_at),
+            }
+        )
     return {"data": items}
 
 
@@ -128,13 +130,29 @@ def get_active_alerts(session: Session = Depends(get_db_session)):
     )
     items = []
     for alert in alerts:
-        items.append({
-            "id": alert.id,
-            "level": alert.level,
-            "headline": alert.headline,
-            "platform": alert.platform,
-            "time": alert.time.isoformat() + "Z" if isinstance(alert.time, datetime) else str(alert.time),
-            "state": alert.state,
-            "risk": alert.risk,
-        })
+        items.append(
+            {
+                "id": alert.id,
+                "level": alert.level,
+                "headline": alert.headline,
+                "platform": alert.platform,
+                "time": alert.time.isoformat() + "Z"
+                if isinstance(alert.time, datetime)
+                else str(alert.time),
+                "state": alert.state,
+                "risk": alert.risk,
+            }
+        )
     return {"data": items}
+
+
+@router.get("/suspicious-sellers")
+def get_suspicious_sellers(service: DashboardService = Depends(get_dashboard_service)):
+    """Return top suspicious merchant leaderboard."""
+    return {"data": service.get_suspicious_sellers()}
+
+
+@router.get("/agent-states")
+def get_agent_states(service: DashboardService = Depends(get_dashboard_service)):
+    """Return LangGraph swarm agent execution states."""
+    return {"data": service.get_swarm_agent_states()}

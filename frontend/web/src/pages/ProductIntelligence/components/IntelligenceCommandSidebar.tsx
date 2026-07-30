@@ -104,11 +104,11 @@ export function IntelligenceCommandSidebar({
       </div>
 
       {/* AI Recommendation Box */}
-      <div className="bg-slate-900 text-white rounded-xl p-4 shadow-md space-y-2 border border-slate-800">
-        <div className="text-xs font-bold uppercase tracking-wider text-violet-300 flex items-center gap-1.5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" /> AI Swarm Recommendation
+      <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl p-4 shadow-sm space-y-2 border border-slate-200 dark:border-slate-800">
+        <div className="text-xs font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> AI Swarm Recommendation
         </div>
-        <p className="text-xs text-slate-300 leading-relaxed">
+        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
           {report?.recommendations[0] ??
             `Prioritize enforcement on ${highestRiskMp} where price anomaly exceeds 50% below MSRP.`}
         </p>

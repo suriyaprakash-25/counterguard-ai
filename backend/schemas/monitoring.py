@@ -60,6 +60,10 @@ class MonitoringHistoryRecordDTO(BaseModel):
 
 
 class MonitoringStatusResponse(BaseModel):
+    server_time: str = Field(
+        default_factory=lambda: datetime.utcnow().isoformat() + "Z"
+    )
+    timezone: str = Field(default="UTC")
     active_jobs: int
     paused_jobs: int
     running_jobs: int

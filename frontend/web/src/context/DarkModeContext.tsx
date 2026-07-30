@@ -19,7 +19,9 @@ const DarkModeContext = createContext<DarkModeContextType>({
 export function DarkModeProvider({ children }: { children: React.ReactNode }) {
   const [darkMode, setDarkModeState] = useState<boolean>(() => {
     const saved = localStorage.getItem('counterguard_soc_theme');
-    return saved === 'dark';
+    if (saved === 'dark') return true;
+    if (saved === 'light') return false;
+    return false; // Default to Light mode
   });
 
   useEffect(() => {

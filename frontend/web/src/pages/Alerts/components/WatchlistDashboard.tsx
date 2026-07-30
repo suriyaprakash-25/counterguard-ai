@@ -4,7 +4,7 @@
  */
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pause, Play, Trash2, Download, Shield, Eye, Tag, FileText } from 'lucide-react';
+import { Plus, Pause, Play, Trash2, Download, Shield, Eye, Tag, FileText, Clock } from 'lucide-react';
 import { apiClient, endpoints } from '../../../shared/api';
 
 export interface WatchlistItem {
@@ -14,7 +14,45 @@ export interface WatchlistItem {
   name: string;
   status: 'ACTIVE' | 'PAUSED';
   created_at: string;
+  next_run?: string;
   alert_count: number;
+}
+
+function WatchlistCountdown({ nextRun }: { nextRun?: string }) {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(() => {
+    if (!nextRun) return null;
+    const targetMs = new Date(nextRun).getTime();
+    if (isNaN(targetMs)) return null;
+    return Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+  });
+
+  React.useEffect(() => {
+    if (!nextRun) return;
+    const targetMs = new Date(nextRun).getTime();
+    if (isNaN(targetMs)) return;
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [nextRun]);
+
+  if (secondsLeft === null) return null;
+
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = secondsLeft % 60;
+  const formattedTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+  return (
+    <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-[10px] flex items-center gap-1">
+      <Clock className="h-3 w-3 text-blue-500 animate-pulse" />
+      in {formattedTime}
+    </span>
+  );
 }
 
 export function WatchlistDashboard() {
@@ -122,7 +160,10 @@ export function WatchlistDashboard() {
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
-                <span className="text-[10px] text-slate-400">{item.alert_count} Alerts</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400">{item.alert_count} Alerts</span>
+                  {!isPaused && item.next_run && <WatchlistCountdown nextRun={item.next_run} />}
+                </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => togglePauseMutation.mutate({ id: item.id, isPaused })}

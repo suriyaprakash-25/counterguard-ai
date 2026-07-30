@@ -3,61 +3,96 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   CSS Custom Properties — Design Token System
-   Reduces Tailwind inline bloat; enables consistent theming
+   CSS Custom Properties — Enterprise Design Tokens (Light & Dark Themes)
    ───────────────────────────────────────────────────────────────────────────── */
 :root {
   /* Brand Colors */
   --cg-purple-primary: #9333ea;
   --cg-purple-light: #a855f7;
-  --cg-purple-dim: rgba(147, 51, 234, 0.15);
-  --cg-purple-border: rgba(147, 51, 234, 0.4);
+  --cg-purple-dim: rgba(147, 51, 234, 0.12);
+  --cg-purple-border: rgba(147, 51, 234, 0.35);
 
-  /* Surface layers */
-  --cg-surface-base: #020617;    /* slate-950 */
-  --cg-surface-card: #0f172a;    /* slate-900 */
-  --cg-surface-raised: #1e293b;  /* slate-800 */
-  --cg-surface-input: #0b1120;
+  /* Light Theme Surface Layers */
+  --cg-surface-base: #f8fafc;    /* slate-50 */
+  --cg-surface-card: #ffffff;    /* white */
+  --cg-surface-raised: #f1f5f9;  /* slate-100 */
+  --cg-surface-input: #ffffff;
 
-  /* Text */
-  --cg-text-primary: #f1f5f9;
-  --cg-text-secondary: #94a3b8;
-  --cg-text-muted: #475569;
+  /* Light Theme Text Tokens */
+  --cg-text-primary: #0f172a;    /* slate-900 */
+  --cg-text-secondary: #475569;  /* slate-600 */
+  --cg-text-muted: #64748b;      /* slate-500 */
 
-  /* Threat Colors */
-  --cg-threat-critical: #f87171;  /* red-400 */
-  --cg-threat-high: #fb923c;      /* orange-400 */
-  --cg-threat-medium: #fbbf24;    /* amber-400 */
-  --cg-threat-safe: #34d399;      /* emerald-400 */
+  /* Threat Indicators */
+  --cg-threat-critical: #dc2626;  /* red-600 */
+  --cg-threat-high: #ea580c;      /* orange-600 */
+  --cg-threat-medium: #d97706;    /* amber-600 */
+  --cg-threat-safe: #059669;      /* emerald-600 */
 
-  /* Border */
-  --cg-border-default: rgba(30, 41, 59, 0.8);
-  --cg-border-subtle: rgba(15, 23, 42, 0.6);
+  /* Borders */
+  --cg-border-default: #e2e8f0;   /* slate-200 */
+  --cg-border-subtle: #f1f5f9;    /* slate-100 */
 
-  /* Animation Durations */
+  /* Timings */
   --cg-anim-fast: 150ms;
   --cg-anim-normal: 250ms;
   --cg-anim-slow: 400ms;
   --cg-anim-skeleton: 1.5s;
 
-  /* Popup dimensions */
-  --cg-popup-width: 420px;
-  --cg-popup-min-height: 640px;
+  /* Dimensions */
+  --cg-popup-width: 440px;
+  --cg-popup-max-height: 720px;
+}
+
+.dark {
+  /* Dark Theme Surface Layers */
+  --cg-surface-base: #020617;    /* slate-950 */
+  --cg-surface-card: #0f172a;    /* slate-900 */
+  --cg-surface-raised: #1e293b;  /* slate-800 */
+  --cg-surface-input: #0b1120;
+
+  /* Dark Theme Text Tokens */
+  --cg-text-primary: #f8fafc;    /* slate-50 */
+  --cg-text-secondary: #94a3b8;  /* slate-400 */
+  --cg-text-muted: #64748b;      /* slate-500 */
+
+  /* Threat Indicators */
+  --cg-threat-critical: #f87171;  /* red-400 */
+  --cg-threat-high: #fb923c;      /* orange-400 */
+  --cg-threat-medium: #fbbf24;    /* amber-400 */
+  --cg-threat-safe: #34d399;      /* emerald-400 */
+
+  /* Borders */
+  --cg-border-default: rgba(30, 41, 59, 0.8);
+  --cg-border-subtle: rgba(15, 23, 42, 0.6);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Base Layer
+   Base Layer & Layout Setup
    ───────────────────────────────────────────────────────────────────────────── */
 @layer base {
+  html, body {
+    width: var(--cg-popup-width);
+    max-height: var(--cg-popup-max-height);
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
   body {
-    @apply bg-slate-950 text-slate-100 font-sans antialiased;
-    selection-color: white;
-    -webkit-text-size-adjust: 100%;
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Focus visible only via keyboard — not mouse */
+  #root {
+    width: var(--cg-popup-width);
+    max-height: var(--cg-popup-max-height);
+    overflow-y: auto;
+    overflow-x: hidden;
+    @apply flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-[600px];
+  }
+
   :focus:not(:focus-visible) {
     outline: none;
   }
@@ -65,252 +100,123 @@
   :focus-visible {
     outline: 2px solid var(--cg-purple-primary);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 6px;
   }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Keyframe Animations
    ───────────────────────────────────────────────────────────────────────────── */
-
-/* Toast slide-in from top */
 @keyframes slideInDown {
-  from {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
 }
 
-/* Card / panel fade + scale in */
 @keyframes fadeInScale {
-  from {
-    opacity: 0;
-    transform: scale(0.97) translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+  from { opacity: 0; transform: scale(0.98) translateY(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* Classic fade-in */
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 
-/* Skeleton shimmer sweep */
 @keyframes shimmer {
-  0% {
-    background-position: -400px 0;
-  }
-  100% {
-    background-position: 400px 0;
-  }
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
 }
 
-/* Threat badge pulse glow — CRITICAL level only */
 @keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
-  50% {
-    box-shadow: 0 0 8px 3px rgba(239, 68, 68, 0.35);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50%      { box-shadow: 0 0 10px 3px rgba(239, 68, 68, 0.3); }
 }
 
-/* Progress bar fill animation */
-@keyframes progressFill {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
-}
-
-/* Spin for loading indicators */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-/* Tooltip pop */
-@keyframes tooltipPop {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   Animation Utility Classes
-   ───────────────────────────────────────────────────────────────────────────── */
-
-.animate-slideInDown {
-  animation: slideInDown var(--cg-anim-normal) ease-out both;
-}
-
-.animate-fadeInScale {
-  animation: fadeInScale var(--cg-anim-slow) cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.animate-fadeIn {
-  animation: fadeIn var(--cg-anim-normal) ease-out both;
-}
-
-.animate-pulseGlow {
-  animation: pulseGlow 2s ease-in-out infinite;
-}
-
-.animate-spin {
-  animation: spin 0.8s linear infinite;
-}
+.animate-slideInDown { animation: slideInDown var(--cg-anim-normal) ease-out both; }
+.animate-fadeInScale { animation: fadeInScale var(--cg-anim-slow) cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fadeIn      { animation: fadeIn var(--cg-anim-normal) ease-out both; }
+.animate-pulseGlow  { animation: pulseGlow 2s ease-in-out infinite; }
+.animate-spin       { animation: spin 0.8s linear infinite; }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Skeleton Shimmer
    ───────────────────────────────────────────────────────────────────────────── */
-
 .skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--cg-surface-raised) 25%,
-    rgba(51, 65, 85, 0.5) 50%,
-    var(--cg-surface-raised) 75%
-  );
+  @apply bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800;
   background-size: 400px 100%;
   animation: shimmer var(--cg-anim-skeleton) ease-in-out infinite;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Custom Scrollbar — Popup main area
+   Scrollbar Styles
    ───────────────────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--cg-surface-base);
+  @apply bg-slate-100 dark:bg-slate-950;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--cg-surface-raised);
-  border-radius: 4px;
-  transition: background var(--cg-anim-fast);
+  @apply bg-slate-300 dark:bg-slate-800 rounded-full transition-colors;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155; /* slate-700 */
-}
-::-webkit-scrollbar-corner {
-  background: transparent;
+  @apply bg-slate-400 dark:bg-slate-700;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Offline Banner
-   ───────────────────────────────────────────────────────────────────────────── */
-.cg-offline-banner {
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(239, 68, 68, 0.12),
-    rgba(239, 68, 68, 0.12) 4px,
-    transparent 4px,
-    transparent 12px
-  );
-  border-color: rgba(239, 68, 68, 0.4);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   Button micro-interactions
+   Button Utilities
    ───────────────────────────────────────────────────────────────────────────── */
 .cg-btn-primary {
-  @apply py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed
-         text-white font-bold text-xs flex items-center justify-center gap-2
-         shadow-lg shadow-purple-900/30 transition-all duration-150;
-  /* Subtle lift on hover */
+  @apply py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed
+         text-white font-semibold text-xs flex items-center justify-center gap-2
+         shadow-md shadow-purple-600/20 hover:shadow-lg hover:shadow-purple-600/30 transition-all duration-150 border border-purple-500/20;
   transform: translateY(0);
 }
 .cg-btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(147, 51, 234, 0.35);
 }
 .cg-btn-primary:active:not(:disabled) {
   transform: translateY(0);
 }
 
 .cg-btn-secondary {
-  @apply py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px] font-mono
-         flex items-center justify-center gap-1.5 border border-slate-700 transition-colors duration-150;
+  @apply py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700
+         text-slate-700 dark:text-slate-200 font-semibold text-xs
+         flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors duration-150;
 }
 
 .cg-btn-icon {
-  @apply p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors duration-150;
+  @apply p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700
+         text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors duration-150;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Tab nav active indicator
-   ───────────────────────────────────────────────────────────────────────────── */
-.cg-tab-active {
-  position: relative;
-}
-.cg-tab-active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 10%;
-  width: 80%;
-  height: 2px;
-  background: var(--cg-purple-primary);
-  border-radius: 2px 2px 0 0;
-  animation: fadeIn var(--cg-anim-fast) ease-out;
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   Risk Score Gauge — Threat telemetry mini pill
+   Threat Badges & Risk Telemetry Pills
    ───────────────────────────────────────────────────────────────────────────── */
 .cg-risk-critical {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--cg-threat-critical);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  @apply bg-red-100 text-red-700 border border-red-300 dark:bg-red-950/80 dark:text-red-300 dark:border-red-800/80;
   animation: pulseGlow 2s ease-in-out infinite;
 }
 .cg-risk-high {
-  background: rgba(251, 146, 60, 0.15);
-  color: var(--cg-threat-high);
-  border: 1px solid rgba(251, 146, 60, 0.4);
+  @apply bg-orange-100 text-orange-700 border border-orange-300 dark:bg-orange-950/80 dark:text-orange-300 dark:border-orange-800/80;
 }
 .cg-risk-medium {
-  background: rgba(251, 191, 36, 0.15);
-  color: var(--cg-threat-medium);
-  border: 1px solid rgba(251, 191, 36, 0.4);
+  @apply bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800/80;
 }
 .cg-risk-safe {
-  background: rgba(52, 211, 153, 0.15);
-  color: var(--cg-threat-safe);
-  border: 1px solid rgba(52, 211, 153, 0.4);
+  @apply bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800/80;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   prefers-reduced-motion — Disable ALL animations for accessibility
-   ───────────────────────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-
-  .skeleton-shimmer {
-    animation: none;
-    background: var(--cg-surface-raised);
-  }
-
-  .animate-pulseGlow,
-  .cg-risk-critical {
-    animation: none;
   }
 }

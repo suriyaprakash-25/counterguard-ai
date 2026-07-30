@@ -37,15 +37,15 @@ export function LiveInvestigationPipeline({ batchStatus }: LiveInvestigationPipe
   ];
 
   return (
-    <div className="bg-slate-900 text-white rounded-xl p-4 shadow-xl border border-slate-800 space-y-4 mb-6">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+    <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 space-y-4 mb-6">
+      <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
         <div className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-violet-400" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-violet-200">
+          <Layers className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-violet-700 dark:text-violet-200">
             LangGraph Swarm Agent Execution Pipeline (Batch: {batchStatus.batch_id})
           </h3>
         </div>
-        <div className="text-xs font-mono text-slate-400">
+        <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
           Status: {batchStatus.completed}/{batchStatus.total} Cases ({batchStatus.progress_pct}%)
         </div>
       </div>
@@ -61,26 +61,26 @@ export function LiveInvestigationPipeline({ batchStatus }: LiveInvestigationPipe
               key={node.id}
               className={`p-3 rounded-lg border text-xs flex flex-col justify-between space-y-1.5 transition-all ${
                 isComp
-                  ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-200'
                   : isRun
-                  ? 'bg-violet-950/60 border-violet-500/50 text-violet-200 animate-pulse'
-                  : 'bg-slate-800/40 border-slate-700/40 text-slate-400'
+                  ? 'bg-violet-50 dark:bg-violet-950/60 border-violet-300 dark:border-violet-500/50 text-violet-800 dark:text-violet-200 animate-pulse'
+                  : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/40 text-slate-500 dark:text-slate-400'
               }`}
             >
               <div className="flex items-center justify-between font-bold text-[11px]">
                 <span className="truncate">{node.label}</span>
                 {isComp ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : isRun ? (
-                  <Loader2 className="h-3.5 w-3.5 text-violet-400 animate-spin shrink-0" />
+                  <Loader2 className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400 animate-spin shrink-0" />
                 ) : (
-                  <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                  <Clock className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                 )}
               </div>
 
-              <div className="text-[10px] text-slate-400 truncate">{node.agent}</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{node.agent}</div>
 
-              <div className="pt-1 border-t border-slate-700/40 text-[9px] flex items-center justify-between">
+              <div className="pt-1 border-t border-slate-200/60 dark:border-slate-700/40 text-[9px] flex items-center justify-between">
                 <span>{node.duration_ms}ms</span>
                 <span>{node.evidence_count} ev</span>
               </div>

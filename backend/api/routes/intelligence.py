@@ -8,12 +8,15 @@ from backend.services.intelligence_service import IntelligenceService
 router = APIRouter(prefix="/intelligence")
 
 
-def get_intelligence_service(session: Session = Depends(get_db_session)) -> IntelligenceService:
+def get_intelligence_service(
+    session: Session = Depends(get_db_session)
+) -> IntelligenceService:
     repo = IntelligenceRepository(session)
     return IntelligenceService(repo)
 
 
 @router.get("/summary")
+@router.get("/global-summary")
 def get_summary(service: IntelligenceService = Depends(get_intelligence_service)):
     return {"data": service.get_summary()}
 
@@ -49,5 +52,7 @@ def get_invoices(service: IntelligenceService = Depends(get_intelligence_service
 
 
 @router.get("/memory")
-def get_memory_insights(service: IntelligenceService = Depends(get_intelligence_service)):
+def get_memory_insights(
+    service: IntelligenceService = Depends(get_intelligence_service)
+):
     return {"data": service.get_memory_insights()}

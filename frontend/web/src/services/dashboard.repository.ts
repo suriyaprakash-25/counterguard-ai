@@ -131,25 +131,21 @@ export const DashboardRepository = {
   },
 
   async getSuspiciousSellers(): Promise<SuspiciousSeller[]> {
-    return [
-      { rank: 1, name: "SHRI SANKESHWAR MOBILE", marketplace: "TradeIndia", investigationsCount: 8, averageRisk: 88, riskLevel: "CRITICAL", trend: "up" },
-      { rank: 2, name: "Madhusudan Traders ji", marketplace: "Meesho", investigationsCount: 6, averageRisk: 82, riskLevel: "CRITICAL", trend: "up" },
-      { rank: 3, name: "Global Deals Store", marketplace: "Amazon", investigationsCount: 5, averageRisk: 74, riskLevel: "HIGH", trend: "stable" },
-      { rank: 4, name: "SuperBargain Outlet", marketplace: "Flipkart", investigationsCount: 4, averageRisk: 68, riskLevel: "HIGH", trend: "up" },
-      { rank: 5, name: "Direct Import Warehouse", marketplace: "AJIO", investigationsCount: 3, averageRisk: 52, riskLevel: "MEDIUM", trend: "down" }
-    ];
+    try {
+      const { data } = await apiClient.get('/api/v1/dashboard/suspicious-sellers');
+      return Array.isArray(data?.data) ? data.data : [];
+    } catch {
+      return [];
+    }
   },
 
   async getSwarmAgentStates(): Promise<SwarmAgentState[]> {
-    return [
-      { agent: "PlanningAgent", title: "Target Objective & Swarm Planner", status: "completed", executionTimeMs: 140, confidence: 95, toolsUsed: ["investigation_planner"] },
-      { agent: "PriceAgent", title: "Global MSRP Anomaly Specialist", status: "completed", executionTimeMs: 310, confidence: 74, toolsUsed: ["price_history"] },
-      { agent: "SellerAgent", title: "WHOIS & Reputation Audit Agent", status: "completed", executionTimeMs: 270, confidence: 74, toolsUsed: ["whois_lookup", "seller_reputation"] },
-      { agent: "BrandAgent", title: "Trademark & Catalog Matcher", status: "completed", executionTimeMs: 405, confidence: 74, toolsUsed: ["trademark_lookup"] },
-      { agent: "ReviewAgent", title: "Image Forensic & NLP Analyzer", status: "completed", executionTimeMs: 220, confidence: 74, toolsUsed: ["reverse_image_search"] },
-      { agent: "TrustedProductAgent", title: "Retrieval-Augmented Provenance", status: "completed", executionTimeMs: 185, confidence: 98, toolsUsed: ["product_search_service"] },
-      { agent: "CoordinatorAgent", title: "Multi-Agent Consensus Synthesizer", status: "completed", executionTimeMs: 510, confidence: 74, toolsUsed: ["llm_service"] }
-    ];
+    try {
+      const { data } = await apiClient.get('/api/v1/dashboard/agent-states');
+      return Array.isArray(data?.data) ? data.data : [];
+    } catch {
+      return [];
+    }
   },
 
   async getRiskTrend(): Promise<RiskTrendPoint[]> {

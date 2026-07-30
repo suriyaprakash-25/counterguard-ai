@@ -41,6 +41,8 @@ import {
   Trash2,
   RotateCcw,
   WifiOff as OfflineIcon,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useChromeStorage } from "../hooks/useChromeStorage";
 import { useActiveTab } from "../hooks/useActiveTab";
@@ -158,6 +160,15 @@ export function PopupPage() {
     }
     HistoryService.getHistory().then(setHistoryList);
   }, [page?.domain]);
+
+  // ── Sync Light / Dark Theme ──────────────────────────────────────────────
+  useEffect(() => {
+    if (settings.darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [settings.darkMode]);
 
   // ── Toast auto-clear ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -530,28 +541,36 @@ export function PopupPage() {
 
       {/* ── Header ── */}
       <header
-        className="p-3.5 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between backdrop-blur"
+        className="p-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm transition-colors"
         role="banner"
       >
         <div className="flex items-center gap-2.5">
           <div
-            className="h-8 w-8 rounded-xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shadow-lg shadow-purple-900/20"
+            className="h-8 w-8 rounded-xl bg-purple-100 dark:bg-purple-600/20 border border-purple-200 dark:border-purple-500/40 flex items-center justify-center text-purple-700 dark:text-purple-400 shadow-sm"
             aria-hidden="true"
           >
             <Shield className="h-4 w-4" />
           </div>
           <div>
-            <h1 className="text-xs font-bold tracking-tight text-white flex items-center gap-1.5">
+            <h1 className="text-xs font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
               CounterGuard{" "}
-              <span className="text-[9px] bg-purple-950 text-purple-300 font-mono border border-purple-800/80 px-1.5 py-0.5 rounded">
+              <span className="text-[9px] bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-mono border border-purple-200 dark:border-purple-800/80 px-1.5 py-0.5 rounded font-bold">
                 SOC v1.0
               </span>
             </h1>
-            <p className="text-[9px] text-slate-400 font-mono">Enterprise Brand Protection Agent</p>
+            <p className="text-[9px] text-slate-500 dark:text-slate-400 font-mono">Enterprise Brand Protection Agent</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2" role="toolbar" aria-label="Extension controls">
+        <div className="flex items-center gap-1.5" role="toolbar" aria-label="Extension controls">
+          <button
+            onClick={() => updateSettings({ darkMode: !settings.darkMode })}
+            className="cg-btn-icon"
+            title={settings.darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label="Toggle theme mode"
+          >
+            {settings.darkMode ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5 text-slate-600" />}
+          </button>
           <button
             onClick={handleAnalyze}
             disabled={analyzing}
@@ -560,7 +579,7 @@ export function PopupPage() {
             aria-label="Refresh threat inspection"
             aria-busy={analyzing}
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${analyzing ? "animate-spin text-purple-400" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${analyzing ? "animate-spin text-purple-600 dark:text-purple-400" : ""}`} />
           </button>
           <button
             onClick={handleOpenSettings}
@@ -575,7 +594,7 @@ export function PopupPage() {
 
       {/* ── Tab Switcher ── */}
       <div
-        className="flex border-b border-slate-800 bg-slate-950 text-[10px] font-mono font-bold"
+        className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 text-[10px] font-mono font-bold"
         role="tablist"
         aria-label="Extension navigation tabs"
       >
@@ -585,15 +604,14 @@ export function PopupPage() {
           aria-selected={activeTabNav === "INSPECT"}
           aria-controls="tabpanel-inspect"
           onClick={() => setActiveTabNav("INSPECT")}
-          className={`flex-1 py-2 text-center flex items-center justify-center gap-1.5 transition-colors ${
+          className={`flex-1 py-2.5 text-center flex items-center justify-center gap-1.5 transition-colors ${
             activeTabNav === "INSPECT"
-              ? "bg-slate-900 text-purple-300 border-b-2 border-purple-500"
-              : "text-slate-400 hover:text-slate-200"
+              ? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 border-b-2 border-purple-600 dark:border-purple-500 font-bold"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
           }`}
         >
           <Search className="h-3 w-3" aria-hidden="true" />
           Threat Inspection
-          <kbd className="hidden text-[8px] text-slate-600 font-mono">Alt+C</kbd>
         </button>
         <button
           role="tab"
@@ -601,15 +619,15 @@ export function PopupPage() {
           aria-selected={activeTabNav === "HISTORY"}
           aria-controls="tabpanel-history"
           onClick={() => setActiveTabNav("HISTORY")}
-          className={`flex-1 py-2 text-center flex items-center justify-center gap-1.5 transition-colors ${
+          className={`flex-1 py-2.5 text-center flex items-center justify-center gap-1.5 transition-colors ${
             activeTabNav === "HISTORY"
-              ? "bg-slate-900 text-purple-300 border-b-2 border-purple-500"
-              : "text-slate-400 hover:text-slate-200"
+              ? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 border-b-2 border-purple-600 dark:border-purple-500 font-bold"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
           }`}
         >
           <HistoryIcon className="h-3 w-3" aria-hidden="true" />
           History
-          <span className="text-[9px] bg-purple-950 text-purple-400 border border-purple-800/60 px-1 rounded font-bold">
+          <span className="text-[9px] bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60 px-1.5 py-0.5 rounded-full font-bold">
             {historyList.length}
           </span>
         </button>
@@ -617,24 +635,24 @@ export function PopupPage() {
 
       {/* ── Backend Status Bar ── */}
       <div
-        className="px-3.5 py-1.5 bg-slate-900/60 border-b border-slate-800/80 flex items-center justify-between text-[10px] font-mono"
+        className="px-4 py-1.5 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-mono"
         role="status"
         aria-label={`Backend status: ${backendStatus === "ONLINE" ? "online" : "offline"}`}
       >
-        <span className="text-slate-400 flex items-center gap-1">
-          <Activity className="h-3 w-3 text-purple-400" aria-hidden="true" />
+        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+          <Activity className="h-3 w-3 text-purple-600 dark:text-purple-400" aria-hidden="true" />
           Backend Engine:
         </span>
         <div className="flex items-center gap-1.5">
           {backendStatus === "ONLINE" ? (
             <>
-              <Wifi className="h-3 w-3 text-emerald-400" aria-hidden="true" />
-              <span className="text-emerald-400 font-bold">FASTAPI ONLINE (Port 8000)</span>
+              <Wifi className="h-3 w-3 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">FASTAPI ONLINE (Port 8000)</span>
             </>
           ) : (
             <>
-              <WifiOff className="h-3 w-3 text-red-400" aria-hidden="true" />
-              <span className="text-red-400 font-bold">BACKEND OFFLINE (Local Mode)</span>
+              <WifiOff className="h-3 w-3 text-red-600 dark:text-red-400" aria-hidden="true" />
+              <span className="text-red-600 dark:text-red-400 font-bold">BACKEND OFFLINE (Local Mode)</span>
             </>
           )}
         </div>

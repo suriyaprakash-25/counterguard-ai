@@ -35,23 +35,27 @@ export function useActiveTab() {
         setLoading(false);
       });
     } else {
-      // Mock fallback for browser dev environment
-      const mockUrl = "https://www.amazon.in/dp/B0CX237A12";
-      const detection = MarketplaceDetector.detect(mockUrl);
-      setPage({
-        url: mockUrl,
-        domain: "amazon.in",
-        title: "Sony WH-1000XM5 Wireless Headphones — Amazon.in",
-        faviconUrl: "https://www.amazon.in/favicon.ico",
-        isSupportedMarketplace: true,
-        marketplaceName: "Amazon",
-        isSecure: true,
-        detection: detection,
-      });
+      const currentUrl = typeof window !== "undefined" ? window.location.href : "about:blank";
+      try {
+        const urlObj = new URL(currentUrl);
+        const host = urlObj.hostname.replace(/^www\./, "");
+        const detection = MarketplaceDetector.detect(currentUrl);
+        setPage({
+          url: currentUrl,
+          domain: host,
+          title: typeof document !== "undefined" ? document.title || host : host,
+          faviconUrl: undefined,
+          isSupportedMarketplace: detection.isMarketplace,
+          marketplaceName: detection.isMarketplace ? detection.marketplace : undefined,
+          isSecure: urlObj.protocol === "https:",
+          detection: detection,
+        });
+      } catch {
+        setPage(null);
+      }
       setLoading(false);
     }
   }, []);
 
   return { page, loading };
 }
-

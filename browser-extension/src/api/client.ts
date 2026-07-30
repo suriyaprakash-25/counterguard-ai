@@ -77,7 +77,7 @@ export class BackendApiClient {
       }
       return { isOnline: false };
     } catch (error) {
-      ExtensionLogger.warn(`Backend ping failed at ${url}:`, error);
+      ExtensionLogger.debug(`Backend ping notice at ${url}:`, error);
       return { isOnline: false };
     }
   }
@@ -105,7 +105,7 @@ export class BackendApiClient {
       }
       return null;
     } catch (error) {
-      ExtensionLogger.error(`Candidate search failed for query '${query}':`, error);
+      ExtensionLogger.debug(`Candidate search notice for query '${query}':`, error);
       return null;
     }
   }
@@ -125,7 +125,7 @@ export class BackendApiClient {
       if (resp.ok) return await resp.json();
       return null;
     } catch (error) {
-      ExtensionLogger.warn("Failed to fetch provider health:", error);
+      ExtensionLogger.debug("Provider health notice:", error);
       return null;
     }
   }

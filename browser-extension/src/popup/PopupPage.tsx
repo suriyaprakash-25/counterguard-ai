@@ -142,11 +142,23 @@ export function PopupPage() {
   // ── Backend Health Check ─────────────────────────────────────────────────
   useEffect(() => {
     PerformanceService.mark("health-check:start");
-    BackendApiClient.checkHealth(settings.backendUrl).then(({ isOnline }) => {
-      setBackendStatus(isOnline ? "ONLINE" : "OFFLINE");
-      PerformanceService.mark("health-check:end");
-      PerformanceService.measure("health-check", "health-check:start", "health-check:end");
-    });
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ type: "GET_BACKEND_STATUS" }, (res) => {
+        if (chrome.runtime.lastError || !res || !res.success || !res.data) {
+          setBackendStatus("OFFLINE");
+        } else {
+          setBackendStatus(res.data.isOnline ? "ONLINE" : "OFFLINE");
+        }
+        PerformanceService.mark("health-check:end");
+        PerformanceService.measure("health-check", "health-check:start", "health-check:end");
+      });
+    } else {
+      BackendApiClient.checkHealth(settings.backendUrl).then(({ isOnline }) => {
+        setBackendStatus(isOnline ? "ONLINE" : "OFFLINE");
+        PerformanceService.mark("health-check:end");
+        PerformanceService.measure("health-check", "health-check:start", "health-check:end");
+      });
+    }
   }, [settings.backendUrl]);
 
   // ── Load cached analysis & history ──────────────────────────────────────

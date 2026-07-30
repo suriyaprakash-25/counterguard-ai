@@ -246,7 +246,14 @@ class ThreatScoringEngine:
         historical_matches = 4 if risk_score >= 75.0 else 2 if risk_score >= 45.0 else 0
         evidence_count = 5 if risk_score >= 50.0 else 2
 
+        import urllib.parse
+
         brand_name = brand or (title.split()[0] if title else "Brand")
+        clean_title = title.split("|")[0].split("-")[0].strip() if title else brand_name
+        encoded_query = urllib.parse.quote(clean_title)
+
+        target_url = url if (url and url.startswith("http")) else ""
+
         trusted_alternatives = [
             {
                 "seller_name": f"{brand_name} Official Direct Store",
@@ -256,7 +263,9 @@ class ThreatScoringEngine:
                 "trust_score": 98.5,
                 "availability": "In Stock",
                 "is_best_recommendation": True,
-                "url": f"https://www.amazon.in/s?k={brand_name}",
+                "url": target_url
+                if "amazon" in target_url.lower()
+                else f"https://www.amazon.in/s?k={encoded_query}",
             },
             {
                 "seller_name": "RetailNet Authorized Distributor",
@@ -268,7 +277,9 @@ class ThreatScoringEngine:
                 "trust_score": 96.0,
                 "availability": "In Stock",
                 "is_best_recommendation": False,
-                "url": f"https://www.flipkart.com/search?q={brand_name}",
+                "url": target_url
+                if "flipkart" in target_url.lower()
+                else f"https://www.flipkart.com/search?q={encoded_query}",
             },
         ]
 

@@ -81,13 +81,27 @@ export const InspectTab = memo(function InspectTab({
           <div className="h-10 animate-pulse bg-slate-100 dark:bg-slate-800/60 rounded-lg" aria-label="Loading page information" />
         ) : page ? (
           <div className="space-y-1.5 min-w-0">
-            <div className="flex items-start gap-2">
-              {page.faviconUrl && (
-                <img src={page.faviconUrl} alt="" className="h-4 w-4 rounded mt-0.5 shrink-0" aria-hidden="true" />
+            <div className="flex items-start justify-between gap-2 min-w-0">
+              <div className="flex items-start gap-2 min-w-0">
+                {page.faviconUrl && (
+                  <img src={page.faviconUrl} alt="" className="h-4 w-4 rounded mt-0.5 shrink-0" aria-hidden="true" />
+                )}
+                <h2 className="text-xs font-semibold text-slate-900 dark:text-white leading-snug break-words min-w-0 max-w-full" title={page.title}>
+                  {page.title}
+                </h2>
+              </div>
+              {page.url && (
+                <a
+                  href={page.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 p-1 shrink-0"
+                  title="Open active product listing in new tab"
+                  aria-label="Open active product listing in new tab"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
               )}
-              <h2 className="text-xs font-semibold text-slate-900 dark:text-white leading-snug break-words min-w-0 max-w-full" title={page.title}>
-                {page.title}
-              </h2>
             </div>
             <p className="text-[11px] font-mono text-purple-600 dark:text-purple-300 break-all" title={page.domain}>
               {page.domain}

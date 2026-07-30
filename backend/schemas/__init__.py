@@ -14,6 +14,7 @@ from backend.schemas.investigation import (
     RiskAssessment,
 )
 from backend.schemas.official_product import OfficialProductProfile
+from backend.schemas.raw_extraction import RawExtractionResult
 
 __all__ = [
     "DeleteInvestigationResponse",
@@ -29,4 +30,5 @@ __all__ = [
     "OfficialProductProfile",
     "SourceCandidate",
     "DiscoveryResult",
+    "RawExtractionResult",
 ]

@@ -5,6 +5,7 @@ from typing import List, Optional
 from backend.providers.discovery.base_provider import SearchProvider
 from backend.providers.discovery.static_brand_provider import StaticBrandProvider
 from backend.schemas.discovery_engine import DiscoveryResult, SourceCandidate
+from backend.services.source_deduplication_engine import SourceDeduplicationEngine
 from backend.services.source_ranking_engine import SourceRankingEngine
 from backend.services.source_verification_engine import SourceVerificationEngine
 
@@ -13,14 +14,30 @@ logger = logging.getLogger(__name__)
 
 class DiscoveryPipeline:
     """
-    DiscoveryPipeline (Sprint 17 Phase 2 Deliverable)
+    DiscoveryPipeline (Sprint 17 Phase 2 Improved Pipeline Architecture)
 
-    Orchestrates provider execution, candidate aggregation, source ranking, and deterministic verification.
-    Extensible architecture supporting registering multiple SearchProvider implementations.
+    Orchestrates provider execution, URL normalization, candidate deduplication,
+    source ranking, and deterministic verification.
+
+    Sequence:
+      Normalize Request
+          ↓
+      Execute Providers
+          ↓
+      Collect Raw Candidates
+          ↓
+      SourceDeduplicationEngine (Normalization & Deduplication Stage)
+          ↓
+      SourceRankingEngine (Priority Scoring & Ranking Stage)
+          ↓
+      SourceVerificationEngine (Deterministic Verification Stage)
+          ↓
+      Return DiscoveryResult
     """
 
     def __init__(self, providers: Optional[List[SearchProvider]] = None):
         self.providers: List[SearchProvider] = providers or [StaticBrandProvider()]
+        self.deduplication_engine = SourceDeduplicationEngine()
         self.ranking_engine = SourceRankingEngine()
         self.verification_engine = SourceVerificationEngine()
         logger.info(
@@ -52,9 +69,9 @@ class DiscoveryPipeline:
         """
         Primary execution entry point for the DiscoveryPipeline:
           1. Normalize Request
-          2. Select Providers
-          3. Execute Providers
-          4. Collect Candidates
+          2. Select & Execute Providers
+          3. Collect Raw Candidates
+          4. Deduplicate Candidates (SourceDeduplicationEngine)
           5. Rank Results (SourceRankingEngine)
           6. Verify Results (SourceVerificationEngine)
           7. Return DiscoveryResult
@@ -66,19 +83,26 @@ class DiscoveryPipeline:
 
         raw_candidates: List[SourceCandidate] = []
         for provider in active_providers:
+            prov_start = time.time()
             try:
                 if provider.health_check():
                     candidates = provider.search(query=query, brand=brand)
+                    prov_latency = round((time.time() - prov_start) * 1000.0, 2)
+                    for cand in candidates:
+                        cand.response_time_ms = prov_latency
                     raw_candidates.extend(candidates)
             except Exception as err:
                 logger.error(
                     f"[DiscoveryPipeline] Error executing provider '{provider.provider_name}': {err}"
                 )
 
-        # Rank candidates
-        ranked_candidates = self.ranking_engine.rank(raw_candidates)
+        # STAGE 4: Deduplicate Candidates
+        deduped_candidates = self.deduplication_engine.deduplicate(raw_candidates)
 
-        # Verify top candidates
+        # STAGE 5: Rank Candidates
+        ranked_candidates = self.ranking_engine.rank(deduped_candidates)
+
+        # STAGE 6: Verify Top Candidates
         verified_source: Optional[SourceCandidate] = None
         verification_reasoning = "No candidate sources discovered."
         pipeline_status = "no_candidates_found"
@@ -117,6 +141,7 @@ class DiscoveryPipeline:
             discovery_time_ms=elapsed_ms,
             metadata={
                 "raw_candidate_count": len(raw_candidates),
+                "deduped_candidate_count": len(deduped_candidates),
                 "ranked_candidate_count": len(ranked_candidates),
             },
         )

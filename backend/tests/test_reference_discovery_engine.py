@@ -5,6 +5,7 @@ from backend.providers.discovery.static_brand_provider import StaticBrandProvide
 from backend.schemas.discovery_engine import SourceCandidate
 from backend.services.discovery_pipeline import DiscoveryPipeline
 from backend.services.reference_discovery_service import ReferenceDiscoveryService
+from backend.services.source_deduplication_engine import SourceDeduplicationEngine
 from backend.services.source_ranking_engine import SourceRankingEngine
 from backend.services.source_verification_engine import SourceVerificationEngine
 
@@ -26,6 +27,53 @@ class FailingTestProvider(SearchProvider):
         return True
 
 
+def test_source_candidate_extended_fields():
+    candidate = SourceCandidate(
+        title="Apple AirPods Pro",
+        url="https://www.apple.com/airpods-pro/",
+        provider="GoogleCSE",
+        source_type="Official Store",
+        confidence=0.95,
+        retrieval_method="serp_api",
+        response_time_ms=145.2,
+        http_status=200,
+        crawl_depth=1,
+        language="en",
+        region="US",
+    )
+
+    assert candidate.domain == "apple.com"
+    assert candidate.retrieval_method == "serp_api"
+    assert candidate.response_time_ms == 145.2
+    assert candidate.http_status == 200
+    assert candidate.timestamp is not None
+
+
+def test_source_deduplication_engine():
+    deduper = SourceDeduplicationEngine()
+
+    c1 = SourceCandidate(
+        title="Google Apple AirPods Result",
+        url="https://apple.com/airpods",
+        provider="GoogleCSE",
+        source_type="Official Store",
+        confidence=0.85,
+    )
+    c2 = SourceCandidate(
+        title="SerpAPI Apple AirPods Result",
+        url="https://www.apple.com/airpods/",
+        provider="SerpAPI",
+        source_type="Official Store",
+        confidence=0.92,
+    )
+
+    deduped = deduper.deduplicate([c1, c2])
+    # Should merge both URLs into ONE canonical candidate
+    assert len(deduped) == 1
+    assert "apple.com/airpods" in deduped[0].url
+    assert deduped[0].confidence == 0.92  # Preserved highest confidence entry
+
+
 def test_static_brand_provider_supported_brand():
     provider = StaticBrandProvider()
     assert provider.supports("nothing") is True
@@ -36,7 +84,7 @@ def test_static_brand_provider_supported_brand():
     assert len(results) == 1
     candidate = results[0]
     assert candidate.provider == "StaticBrandProvider"
-    assert "nothing.tech" in candidate.url
+    assert candidate.domain == "nothing.tech"
     assert candidate.source_type == "Official Store"
     assert candidate.confidence == 0.98
 
@@ -64,19 +112,11 @@ def test_source_ranking_engine():
         provider="TestProv",
         confidence=0.98,
     )
-    c3 = SourceCandidate(
-        title="Duplicate Official Brand Store",
-        url="https://nike.com/shoes/",
-        source_type="Official Store",
-        provider="TestProv",
-        confidence=0.98,
-    )
 
-    ranked = ranker.rank([c1, c2, c3])
-    # Duplicate URL should be removed, and Official Store ranked first
+    ranked = ranker.rank([c1, c2])
     assert len(ranked) == 2
     assert ranked[0].source_type == "Official Store"
-    assert "nike.com" in ranked[0].url
+    assert ranked[0].domain == "nike.com"
     assert ranked[1].source_type == "Marketplace"
 
 
@@ -127,9 +167,10 @@ def test_discovery_pipeline_end_to_end():
     assert res.status == "success"
     assert len(res.candidate_sources) >= 1
     assert res.verified_source is not None
-    assert "nike.com" in res.verified_source.url
+    assert res.verified_source.domain == "nike.com"
     assert res.confidence == 0.98
     assert "StaticBrandProvider" in res.providers_used
+    assert res.metadata["deduped_candidate_count"] >= 1
 
 
 def test_discovery_pipeline_provider_resilience():
@@ -138,10 +179,9 @@ def test_discovery_pipeline_provider_resilience():
     )
     res = pipeline.run(query="Galaxy S24", brand="Samsung")
 
-    # Should gracefully bypass FailingTestProvider and succeed via StaticBrandProvider
     assert res.status == "success"
     assert res.verified_source is not None
-    assert "samsung.com" in res.verified_source.url
+    assert res.verified_source.domain == "samsung.com"
 
 
 def test_reference_discovery_service_end_to_end():
@@ -152,7 +192,7 @@ def test_reference_discovery_service_end_to_end():
 
     assert discovery_result.status == "success"
     assert discovery_result.verified_source is not None
-    assert "apple.com" in discovery_result.verified_source.url
+    assert discovery_result.verified_source.domain == "apple.com"
 
     assert profile.brand == "Apple"
     assert profile.product_name == "AirPods Pro"

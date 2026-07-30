@@ -59,32 +59,43 @@ class ThreatScoringEngine:
         title_lower = (title or "").lower()
         seller_lower = (seller or "").lower()
 
-        # 1. Baseline MSRP Determination
+        # 1. Dynamic Scalable MSRP Determination via LivePriceAdapter & Brand Intelligence
+        from backend.providers.price.live_price_adapter import LivePriceAdapter
+
         msrp = 0.0
-        if "sony" in title_lower or "wh-1000xm5" in title_lower:
-            msrp = 24990.0
-        elif "airpods" in title_lower:
-            msrp = 22900.0
-        elif "cmf" in title_lower or "nothing buds" in title_lower:
-            msrp = 2499.0
-        elif "air force" in title_lower or "af1" in title_lower:
-            msrp = 8195.0
-        elif "puma" in title_lower:
-            msrp = 4999.0
-        elif "samsung" in title_lower and "buds" in title_lower:
-            msrp = 11999.0
-        elif "marshall" in title_lower:
-            msrp = 11999.0
-        elif "boat" in title_lower:
-            msrp = 1299.0
-        elif "jbl" in title_lower:
-            msrp = 2999.0
-        elif "sennheiser" in title_lower:
-            msrp = 8990.0
-        elif "bose" in title_lower:
-            msrp = 26900.0
-        else:
-            msrp = max(price * 1.25, 1999.0) if price > 0 else 2499.0
+        try:
+            price_adapter = LivePriceAdapter()
+            price_data = price_adapter.lookup(title)
+            if price_data and price_data.get("average_msrp", 0.0) > 0:
+                msrp = price_data["average_msrp"]
+        except Exception as err:
+            logger.debug(f"[ThreatScoringEngine] Live MSRP lookup notice: {err}")
+
+        if msrp <= 0:
+            if "sony" in title_lower or "wh-1000xm5" in title_lower:
+                msrp = 24990.0
+            elif "airpods" in title_lower:
+                msrp = 22900.0
+            elif "cmf" in title_lower or "nothing buds" in title_lower:
+                msrp = 2499.0
+            elif "air force" in title_lower or "af1" in title_lower:
+                msrp = 8195.0
+            elif "puma" in title_lower:
+                msrp = 4999.0
+            elif "samsung" in title_lower and "buds" in title_lower:
+                msrp = 11999.0
+            elif "marshall" in title_lower:
+                msrp = 11999.0
+            elif "boat" in title_lower:
+                msrp = 1299.0
+            elif "jbl" in title_lower:
+                msrp = 2999.0
+            elif "sennheiser" in title_lower:
+                msrp = 8990.0
+            elif "bose" in title_lower:
+                msrp = 26900.0
+            else:
+                msrp = max(price * 1.25, 1999.0) if price > 0 else 2499.0
 
         # 2. Price Deviation Penalty
         price_penalty = 0.0

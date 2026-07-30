@@ -12,6 +12,7 @@ from backend.schemas.investigation import (
     InvestigationRequest,
     RiskAssessment,
 )
+from backend.schemas.official_product import OfficialProductProfile
 
 __all__ = [
     "DeleteInvestigationResponse",
@@ -24,4 +25,5 @@ __all__ = [
     "InvestigationReport",
     "InvestigationRequest",
     "RiskAssessment",
+    "OfficialProductProfile",
 ]

@@ -14,7 +14,7 @@ from backend.schemas.recommendation import TrustedProductResult
 from backend.schemas.scraping import ScrapingResult
 
 
-def merge_context(
+def merge_context(  # noqa: C901
     a: InvestigationContext, b: InvestigationContext
 ) -> InvestigationContext:
     if not a:
@@ -128,6 +128,15 @@ class InvestigationState(TypedDict, total=False):
     # Trusted Product Recommendation Agent
     trusted_product_result: TrustedProductResult
     recommended_products: List[Dict[str, Any]]
+
+    # -- SPRINT 17: REFERENCE DISCOVERY ARCHITECTURE FOUNDATION --
+    from backend.schemas.official_product import OfficialProductProfile
+
+    official_product_profile: OfficialProductProfile
+    reference_discovery_result: Dict[str, Any]
+    reference_status: str
+    reference_source: str
+    reference_confidence: float
 
     # Legacy Outputs
     coordinator_result: AIInvestigationResult

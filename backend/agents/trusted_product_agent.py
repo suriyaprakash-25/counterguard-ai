@@ -14,6 +14,14 @@ class TrustedProductAgent:
     Retrieval-Augmented Agent responsible for executing ProductSearchService,
     validating live URLs against trusted domains, and synthesizing LLM explanations
     strictly from empirical retrieved product data.
+
+    ---------------------------------------------------------------------------
+    [LEGACY COMPONENT MIGRATION NOTICE - SPRINT 17]
+    This agent currently executes post-coordinator retrieval against hardcoded catalog mappings.
+    In future Sprint 17 phases, this component will delegate reference discovery to the new
+    `ReferenceDiscoveryAgent` and `ReferenceDiscoveryService` running prior to specialist fan-out.
+    Its runtime execution logic remains unchanged in Phase 1 for 100% backward compatibility.
+    ---------------------------------------------------------------------------
     """
 
     def __init__(self):

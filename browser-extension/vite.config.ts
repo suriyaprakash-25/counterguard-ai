@@ -13,7 +13,7 @@ function copyExtensionAssets() {
       if (fs.existsSync(manifestSrc)) {
         fs.copyFileSync(manifestSrc, manifestDest);
       }
-      
+
       const iconsSrc = resolve(__dirname, 'public/icons');
       const iconsDest = resolve(__dirname, 'dist/icons');
       if (fs.existsSync(iconsSrc)) {
@@ -38,7 +38,30 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // Terser minification for maximum compression
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,       // Remove console.* in production
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+        passes: 2,
+        unsafe_arrows: true,
+        unsafe_methods: true,
+      },
+      mangle: {
+        safari10: true,
+      },
+      format: {
+        comments: false,          // Strip all comments
+      },
+    },
+    chunkSizeWarningLimit: 200,
     rollupOptions: {
+      treeshake: {
+        moduleSideEffects: false,
+        propertyReadSideEffects: false,
+      },
       input: {
         popup: resolve(__dirname, 'src/popup/index.html'),
         options: resolve(__dirname, 'src/options/index.html'),
@@ -46,13 +69,31 @@ export default defineConfig({
         content: resolve(__dirname, 'src/content/index.ts'),
       },
       output: {
+        // Chunk splitting for source files (not node_modules — those are pre-bundled by Vite)
+        manualChunks(id) {
+          // Extension services — shared by popup + content
+          if (id.includes('/src/services/')) {
+            return 'extension-services';
+          }
+          // Extension API layer
+          if (id.includes('/src/api/')) {
+            return 'extension-api';
+          }
+          // Parsers — heaviest non-vendor chunk, lazy loaded
+          if (id.includes('/src/parsers/')) {
+            return 'extension-parsers';
+          }
+          // Popup tab components — split per lazy tab
+          if (id.includes('/src/popup/tabs/InspectTab')) {
+            return 'popup-tab-inspect';
+          }
+          if (id.includes('/src/popup/tabs/HistoryTab')) {
+            return 'popup-tab-history';
+          }
+        },
         entryFileNames: (chunkInfo) => {
-          if (chunkInfo.name === 'background') {
-            return 'background.js';
-          }
-          if (chunkInfo.name === 'content') {
-            return 'content.js';
-          }
+          if (chunkInfo.name === 'background') return 'background.js';
+          if (chunkInfo.name === 'content') return 'content.js';
           return 'assets/js/[name]-[hash].js';
         },
         chunkFileNames: 'assets/js/[name]-[hash].js',

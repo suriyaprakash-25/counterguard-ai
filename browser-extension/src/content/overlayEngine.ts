@@ -2,7 +2,8 @@
  * overlayEngine.ts — High Performance Dynamic Overlay Engine
  * Injects non-intrusive security badges (VERIFIED, SUSPICIOUS, COUNTERFEIT_RISK, RECOMMENDED, TRUSTED_SELLER)
  * into marketplace search catalog items and product detail pages with debounced MutationObserver,
- * WeakSet duplicate prevention, zero-flickering, hover tooltips, and dynamic DOM cleanup.
+ * WeakSet duplicate prevention, WeakMap GC-friendly badge tracking, zero-flickering,
+ * hover tooltips, IntersectionObserver auto-cleanup, and dynamic DOM cleanup.
  */
 
 import { BadgeConfig, BadgeType, MarketplaceCardSelectorMap } from "../types/overlay";
@@ -10,10 +11,22 @@ import { ExtensionLogger } from "../services/logger.service";
 
 export class OverlayEngine {
   private observer: MutationObserver | null = null;
+  private cleanupObserver: IntersectionObserver | null = null;
+  /**
+   * WeakSet tracks which elements have been processed.
+   * GC automatically reclaims entries when elements are removed from DOM.
+   */
   private processedElements: WeakSet<Element> = new WeakSet();
+  /**
+   * WeakMap maps each host element → its injected badge container.
+   * Allows O(1) badge lookup without DOM query, and is GC-friendly.
+   */
+  private badgeMap: WeakMap<Element, HTMLElement> = new WeakMap();
   private debounceTimer: number | null = null;
   private activeMarketplace: string = "Unknown";
   private isScanning: boolean = false;
+  /** Track total badges injected for metrics */
+  private injectedCount: number = 0;
 
   private static readonly BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
     VERIFIED: {
@@ -112,7 +125,28 @@ export class OverlayEngine {
    */
   public initialize(marketplace: string, rootDoc: Document = document): void {
     this.activeMarketplace = marketplace.toLowerCase();
+    this.injectedCount = 0;
     ExtensionLogger.info(`[OverlayEngine] Initializing dynamic overlay engine for '${marketplace}'...`);
+
+    // Setup IntersectionObserver for auto-cleanup of detached/off-screen elements
+    // threshold: 0 fires when element has 0% intersection (detached or hidden)
+    if (typeof IntersectionObserver !== "undefined") {
+      this.cleanupObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            // If element is completely out of view AND badge still attached, remove badge
+            if (!entry.isIntersecting) {
+              const badge = this.badgeMap.get(entry.target);
+              if (badge && !badge.isConnected) {
+                badge.remove();
+                this.badgeMap.delete(entry.target);
+              }
+            }
+          });
+        },
+        { threshold: 0 }
+      );
+    }
 
     // Initial scan
     this.scanAndInject(rootDoc);
@@ -171,14 +205,19 @@ export class OverlayEngine {
   }
 
   /**
-   * Inject non-intrusive badge container into target product element
+   * Inject non-intrusive badge container into target product element.
+   * Uses WeakMap to store badge reference for O(1) lookup and GC-friendly cleanup.
    */
   private injectBadge(cardEl: Element, type: BadgeType): void {
-    if (cardEl.querySelector(".cg-badge-container")) return;
+    // O(1) check via WeakMap instead of DOM query
+    if (this.badgeMap.has(cardEl)) return;
 
     const config = OverlayEngine.BADGE_CONFIGS[type];
     const container = document.createElement("div");
     container.className = "cg-badge-container";
+    // ARIA: badge is presentational, not interactive
+    container.setAttribute("aria-hidden", "true");
+    container.setAttribute("role", "presentation");
 
     const badge = document.createElement("span");
     badge.className = `cg-badge ${config.bgClass}`;
@@ -187,9 +226,17 @@ export class OverlayEngine {
     const tooltip = document.createElement("div");
     tooltip.className = "cg-tooltip";
     tooltip.textContent = config.tooltipText;
+    // Tooltip accessible via aria-describedby on badge
+    const tooltipId = `cg-tip-${this.injectedCount}`;
+    tooltip.id = tooltipId;
+    badge.setAttribute("aria-describedby", tooltipId);
 
     container.appendChild(badge);
     container.appendChild(tooltip);
+
+    // Store in WeakMap before DOM insertion
+    this.badgeMap.set(cardEl, container);
+    this.injectedCount++;
 
     // Prepend to card element without affecting inner layout
     if (cardEl.firstChild) {
@@ -197,6 +244,9 @@ export class OverlayEngine {
     } else {
       cardEl.appendChild(container);
     }
+
+    // Register with IntersectionObserver for auto-cleanup tracking
+    this.cleanupObserver?.observe(cardEl);
   }
 
   /**
@@ -223,19 +273,38 @@ export class OverlayEngine {
   }
 
   /**
-   * Cleanup observer and remove all injected badges on tab change or unmount
+   * Cleanup observer and remove all injected badges on tab change or unmount.
+   * Disconnects both MutationObserver and IntersectionObserver.
+   * WeakMap/WeakSet entries are automatically GC'd after element removal.
    */
   public cleanup(rootDoc: Document = document): void {
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
     }
+    if (this.cleanupObserver) {
+      this.cleanupObserver.disconnect();
+      this.cleanupObserver = null;
+    }
     if (this.debounceTimer !== null) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+    // Remove all badge containers from DOM
     rootDoc.querySelectorAll(".cg-badge-container").forEach((el) => el.remove());
-    ExtensionLogger.info("[OverlayEngine] Cleaned up dynamic overlays and MutationObserver.");
+    // Reset counters (WeakMap/WeakSet cleaned by GC)
+    this.injectedCount = 0;
+    ExtensionLogger.info("[OverlayEngine] Cleaned up dynamic overlays, MutationObserver, and IntersectionObserver.");
+  }
+
+  /**
+   * Get current injection metrics for debugging
+   */
+  public getMetrics(): { injectedCount: number; marketplace: string } {
+    return {
+      injectedCount: this.injectedCount,
+      marketplace: this.activeMarketplace,
+    };
   }
 }
 

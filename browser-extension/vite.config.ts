@@ -39,6 +39,7 @@ function copyExtensionAssets() {
       if (fs.existsSync(popupNested)) {
         let html = fs.readFileSync(popupNested, 'utf8');
         html = html.replace(/\.\.\/\.\.\/assets\//g, './assets/');
+        html = html.replace(/\s+crossorigin(?:="[^"]*")?/g, '');
         fs.writeFileSync(popupFlat, html, 'utf8');
         fs.rmSync(resolve(__dirname, 'dist/src/popup'), { recursive: true, force: true });
       }
@@ -49,6 +50,7 @@ function copyExtensionAssets() {
       if (fs.existsSync(optionsNested)) {
         let html = fs.readFileSync(optionsNested, 'utf8');
         html = html.replace(/\.\.\/\.\.\/assets\//g, './assets/');
+        html = html.replace(/\s+crossorigin(?:="[^"]*")?/g, '');
         fs.writeFileSync(optionsFlat, html, 'utf8');
         fs.rmSync(resolve(__dirname, 'dist/src/options'), { recursive: true, force: true });
       }
@@ -64,8 +66,6 @@ function copyExtensionAssets() {
 
 export default defineConfig({
   plugins: [react(), copyExtensionAssets()],
-  // CRITICAL: base must be './' so Vite outputs relative paths (./assets/...)
-  // Absolute paths (/assets/...) break under chrome-extension:// protocol
   base: './',
   resolve: {
     alias: {
@@ -75,22 +75,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    // Use relative base so all asset paths are relative (critical for chrome-extension:// protocol)
-    // Note: We set base at the rollup output level via relative paths in HTML
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug'],
-        passes: 2,
-        unsafe_arrows: true,
-        unsafe_methods: true,
-      },
-      mangle: { safari10: true },
-      format: { comments: false },
-    },
-    chunkSizeWarningLimit: 200,
+    modulePreload: false,
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       input: {
         popup:   resolve(__dirname, 'src/popup/index.html'),

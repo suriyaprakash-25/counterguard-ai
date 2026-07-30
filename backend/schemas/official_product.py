@@ -2,6 +2,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from backend.schemas.extraction_evidence import ExtractionEvidence
+
 
 class OfficialProductProfile(BaseModel):
     """
@@ -55,6 +57,10 @@ class OfficialProductProfile(BaseModel):
     )
     last_verified: Optional[str] = Field(
         None, description="ISO timestamp of last verification check"
+    )
+    evidence_trail: List[ExtractionEvidence] = Field(
+        default_factory=list,
+        description="Traceable evidence items proving field extraction provenance",
     )
     metadata: Dict[str, Any] = Field(
         default_factory=dict,

@@ -76,6 +76,7 @@ class ExtractionNormalizationEngine:
             warranty=raw.raw_warranty,
             source=raw.provider,
             confidence=raw.confidence,
+            evidence_trail=raw.evidence_trail,
             metadata={
                 "extraction_method": raw.extraction_method,
                 "extraction_time_ms": raw.extraction_time_ms,

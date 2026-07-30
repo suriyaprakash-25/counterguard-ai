@@ -1,4 +1,5 @@
 from backend.schemas.discovery_engine import DiscoveryResult, SourceCandidate
+from backend.schemas.extraction_evidence import ExtractionEvidence
 from backend.schemas.history import (
     DeleteInvestigationResponse,
     EvidenceItemSchema,
@@ -31,4 +32,5 @@ __all__ = [
     "SourceCandidate",
     "DiscoveryResult",
     "RawExtractionResult",
+    "ExtractionEvidence",
 ]

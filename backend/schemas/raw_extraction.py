@@ -3,11 +3,13 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from backend.schemas.extraction_evidence import ExtractionEvidence
+
 
 class RawExtractionResult(BaseModel):
     """
     Intermediate un-normalized extraction data container returned by an ExtractionProvider.
-    Captures raw scraped strings, unstructured specs, and images prior to normalization.
+    Captures raw scraped strings, unstructured specs, images, and evidence trails prior to normalization.
     """
 
     url: str = Field(..., description="Target webpage URL that was extracted")
@@ -33,6 +35,10 @@ class RawExtractionResult(BaseModel):
         None, description="Raw product description text"
     )
     raw_warranty: Optional[str] = Field(None, description="Raw warranty text snippet")
+    evidence_trail: List[ExtractionEvidence] = Field(
+        default_factory=list,
+        description="Traceable evidence items proving field extraction provenance",
+    )
     extraction_method: str = Field(
         "html",
         description="Extraction strategy: 'html', 'json_ld', 'structured_api', 'dom'",

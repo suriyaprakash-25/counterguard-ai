@@ -90,10 +90,40 @@ def analyze_browser_product_card(
         historical_matches = 4 if risk_score >= 70.0 else 1 if risk_score >= 40.0 else 0
         evidence_count = 5 if risk_score >= 50.0 else 2
 
+        brand_name = request.brand or "Sony"
         trusted_alternatives = [
-          {"name": "Appario Retail (Official Distributor)", "url": f"https://www.amazon.in/s?k={request.brand or 'Sony'}"},
-          {"name": "Treasure Troll (Authorized Brand Partner)", "url": f"https://www.flipkart.com/search?q={request.brand or 'Sony'}"}
+            {
+                "seller_name": "Appario Retail Pvt Ltd (Official Distributor)",
+                "marketplace": "Amazon",
+                "price": max(999.0, request.price * 1.05) if request.price > 0 else 24990.0,
+                "currency": "INR",
+                "trust_score": 98.5,
+                "availability": "In Stock",
+                "is_best_recommendation": True,
+                "url": f"https://www.amazon.in/s?k={brand_name}",
+            },
+            {
+                "seller_name": "Treasure Troll Retail (Authorized Partner)",
+                "marketplace": "Flipkart",
+                "price": max(999.0, request.price * 1.02) if request.price > 0 else 24500.0,
+                "currency": "INR",
+                "trust_score": 96.0,
+                "availability": "Only 3 Left",
+                "is_best_recommendation": False,
+                "url": f"https://www.flipkart.com/search?q={brand_name}",
+            },
+            {
+                "seller_name": "Myntra Direct Authorized Store",
+                "marketplace": "Myntra",
+                "price": max(999.0, request.price * 1.08) if request.price > 0 else 25990.0,
+                "currency": "INR",
+                "trust_score": 94.2,
+                "availability": "In Stock",
+                "is_best_recommendation": False,
+                "url": f"https://www.myntra.com/{brand_name.lower()}",
+            },
         ]
+
 
         inv_id = f"inv-{uuid.uuid4().hex[:8]}"
         ev_id = f"ev-{uuid.uuid4().hex[:12]}"

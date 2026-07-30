@@ -25,6 +25,18 @@ class BrowserAnalysisRequest(BaseModel):
     confidence_score: float = Field(100.0, description="DOM Extraction confidence score")
 
 
+class TrustedAlternativeItem(BaseModel):
+    """Verified Authorized Seller Option."""
+    seller_name: str = Field(..., description="Official Authorized Seller Name")
+    marketplace: str = Field(..., description="Marketplace Name")
+    price: float = Field(..., description="Price in INR")
+    currency: str = Field("INR", description="Currency code")
+    trust_score: float = Field(..., ge=0.0, le=100.0, description="Seller Trust Score (0-100)")
+    availability: str = Field("In Stock", description="Stock Availability Status")
+    is_best_recommendation: bool = Field(False, description="Flag highlighting top recommended option")
+    url: str = Field(..., description="Direct Open Listing URL")
+
+
 class BrowserAnalysisResponse(BaseModel):
     """Response returned by CounterGuard Intelligence Backend to Extension Popup."""
     risk_score: float = Field(..., ge=0.0, le=100.0, description="Overall Threat Risk Score (0-100)")
@@ -36,7 +48,6 @@ class BrowserAnalysisResponse(BaseModel):
     evidence_count: int = Field(1, description="Total raw evidence items archived")
     fraud_ring: Optional[str] = Field(None, description="Detected Fraud Ring Cluster ID if any")
     historical_matches: int = Field(0, description="Total historical counterfeit matches in graph DB")
-    trusted_alternatives: List[Dict[str, str]] = Field(default_factory=list, description="Verified authorized seller alternatives")
+    trusted_alternatives: List[TrustedAlternativeItem] = Field(default_factory=list, description="Verified authorized seller alternatives")
     findings: List[str] = Field(default_factory=list, description="Key Risk Findings & Anomaly Indicators")
     analyzed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-

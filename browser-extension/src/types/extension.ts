@@ -23,6 +23,8 @@ export interface PageMetadata {
   detection?: MarketplaceDetectionResult;
 }
 
+import { TrustedAlternativeItem } from "./api";
+
 export interface SecurityAnalysisResult {
   candidateId?: string;
   marketplace: string;
@@ -37,13 +39,14 @@ export interface SecurityAnalysisResult {
   evidenceCount?: number;
   fraudRing?: string;
   historicalMatches?: number;
-  trustedAlternatives?: Array<{ name: string; url: string }>;
+  trustedAlternatives?: TrustedAlternativeItem[];
   verdict: string;
   matchedListingsCount: number;
   confidenceScore: number;
   analyzedAt: string;
   findings: string[];
 }
+
 
 
 

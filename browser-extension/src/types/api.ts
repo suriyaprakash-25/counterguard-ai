@@ -35,6 +35,17 @@ export interface ProviderHealthResponse {
   providers: ProviderHealthItem[];
 }
 
+export interface TrustedAlternativeItem {
+  seller_name: string;
+  marketplace: string;
+  price: number;
+  currency: string;
+  trust_score: number;
+  availability: string;
+  is_best_recommendation: boolean;
+  url: string;
+}
+
 export interface BrowserAnalysisResponse {
   risk_score: number;
   threat_level: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "SAFE";
@@ -45,9 +56,10 @@ export interface BrowserAnalysisResponse {
   evidence_count: number;
   fraud_ring?: string;
   historical_matches: number;
-  trusted_alternatives: Array<{ name: string; url: string }>;
+  trusted_alternatives: TrustedAlternativeItem[];
   findings: string[];
   analyzed_at: string;
 }
+
 
 

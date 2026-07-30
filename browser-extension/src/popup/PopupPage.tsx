@@ -21,11 +21,15 @@ import {
   XCircle,
   Clock,
   Check,
+  Star,
+  ArrowUpDown,
+  Filter,
 } from "lucide-react";
 import { useChromeStorage } from "../hooks/useChromeStorage";
 import { useActiveTab } from "../hooks/useActiveTab";
 import { BackendApiClient } from "../api/client";
 import { BackendHealthStatus, SecurityAnalysisResult } from "../types/extension";
+import { TrustedAlternativeItem } from "../types/api";
 import { ChromeStorageService } from "../services/storage.service";
 import { DomExtractionEngine } from "../parsers";
 
@@ -48,6 +52,10 @@ export function PopupPage() {
   const [liveInv, setLiveInv] = useState<ActiveInvState | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Sorting & Filtering state for Trusted Alternatives
+  const [altFilter, setAltFilter] = useState<string>("ALL");
+  const [altSort, setAltSort] = useState<"TRUST_DESC" | "PRICE_ASC">("TRUST_DESC");
 
   // Check Backend Health
   useEffect(() => {
@@ -229,8 +237,28 @@ export function PopupPage() {
     }
   };
 
+  // Processed alternatives with filtering and sorting
+  const getProcessedAlternatives = (): TrustedAlternativeItem[] => {
+    if (!analysis?.trustedAlternatives) return [];
+    let list = [...analysis.trustedAlternatives];
+
+    if (altFilter !== "ALL") {
+      list = list.filter((a) => a.marketplace.toLowerCase() === altFilter.toLowerCase());
+    }
+
+    if (altSort === "TRUST_DESC") {
+      list.sort((a, b) => b.trust_score - a.trust_score);
+    } else if (altSort === "PRICE_ASC") {
+      list.sort((a, b) => a.price - b.price);
+    }
+
+    return list;
+  };
+
+  const processedAlternatives = getProcessedAlternatives();
+
   return (
-    <div className="w-[420px] bg-slate-950 text-white min-h-[600px] flex flex-col font-sans border border-slate-800 shadow-2xl">
+    <div className="w-[420px] bg-slate-950 text-white min-h-[620px] flex flex-col font-sans border border-slate-800 shadow-2xl">
       {/* ── Toast Notification Banner ────────────────────────────────────── */}
       {toastMsg && (
         <div className="bg-purple-600 text-white px-3 py-2 text-xs font-semibold flex items-center justify-between shadow-lg animate-fadeIn font-mono">
@@ -293,7 +321,7 @@ export function PopupPage() {
       </div>
 
       {/* ── Main Body ────────────────────────────────────────────────────── */}
-      <main className="flex-1 p-3.5 space-y-3 overflow-y-auto max-h-[480px]">
+      <main className="flex-1 p-3.5 space-y-3 overflow-y-auto max-h-[500px]">
         {/* Active Target Site Card */}
         <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-[9px] text-slate-400 uppercase tracking-wider font-mono">
@@ -560,24 +588,99 @@ export function PopupPage() {
               </ul>
             </div>
 
-            {/* Trusted Authorized Seller Alternatives */}
+            {/* ── TRUSTED AUTHORIZED SELLER ALTERNATIVES PANEL ───────────────────── */}
             {analysis.trustedAlternatives && analysis.trustedAlternatives.length > 0 && (
-              <div className="space-y-1 pt-1 border-t border-slate-800">
-                <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-emerald-400" /> Trusted Brand Sellers
-                </span>
-                <div className="space-y-1">
-                  {analysis.trustedAlternatives.map((alt, i) => (
-                    <a
-                      key={i}
-                      href={alt.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-between p-1.5 rounded bg-slate-950 hover:bg-slate-800 text-[10px] font-mono text-emerald-300 border border-slate-800 transition-colors"
+              <div className="space-y-2.5 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Trusted Authorized Sellers
+                  </span>
+
+                  {/* Sort Dropdown */}
+                  <div className="flex items-center gap-1 text-[9px] font-mono">
+                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                    <select
+                      value={altSort}
+                      onChange={(e) => setAltSort(e.target.value as "TRUST_DESC" | "PRICE_ASC")}
+                      className="bg-slate-950 text-slate-200 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] font-mono focus:outline-none"
                     >
-                      <span className="truncate">{alt.name}</span>
-                      <ExternalLink className="h-3 w-3 shrink-0 text-slate-400" />
-                    </a>
+                      <option value="TRUST_DESC">Trust (High → Low)</option>
+                      <option value="PRICE_ASC">Price (Low → High)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Marketplace Filter Pills */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[9px] font-mono">
+                  <Filter className="h-3 w-3 text-slate-400 shrink-0" />
+                  {["ALL", "Amazon", "Flipkart", "Myntra", "AJIO"].map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setAltFilter(m)}
+                      className={`px-2 py-0.5 rounded font-bold transition-colors shrink-0 ${
+                        altFilter === m
+                          ? "bg-emerald-600 text-white border border-emerald-500"
+                          : "bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Rich Trusted Alternative Cards Grid */}
+                <div className="space-y-2">
+                  {processedAlternatives.map((alt, i) => (
+                    <div
+                      key={i}
+                      className={`p-2.5 rounded-lg bg-slate-950 border transition-all ${
+                        alt.is_best_recommendation
+                          ? "border-emerald-500/80 shadow-md shadow-emerald-950/40"
+                          : "border-slate-800"
+                      }`}
+                    >
+                      {/* Top Best Recommendation Highlight */}
+                      {alt.is_best_recommendation && (
+                        <div className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded mb-1.5 w-fit">
+                          <Star className="h-3 w-3 fill-emerald-400" /> BEST VERIFIED RECOMMENDATION
+                        </div>
+                      )}
+
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                            {alt.seller_name}
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                          </h4>
+
+                          <div className="flex items-center gap-2 text-[9px] font-mono text-slate-400">
+                            <span className="bg-slate-900 border border-slate-800 text-purple-300 px-1.5 py-0.5 rounded font-bold">
+                              {alt.marketplace}
+                            </span>
+                            <span className="text-emerald-400 font-bold">
+                              {alt.trust_score}% Trust
+                            </span>
+                            <span className="text-amber-300">
+                              {alt.availability}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="text-xs font-bold text-emerald-400 font-mono">
+                            ₹{alt.price.toLocaleString("en-IN")}
+                          </div>
+                          <a
+                            href={alt.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-flex items-center gap-1 text-[9px] font-mono font-bold text-purple-300 hover:text-purple-200 bg-purple-950/80 hover:bg-purple-900 border border-purple-800 px-2 py-1 rounded transition-colors"
+                          >
+                            Open Listing <ExternalLink className="h-2.5 w-2.5" />
+                          </a>
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>

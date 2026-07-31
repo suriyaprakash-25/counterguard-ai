@@ -184,6 +184,22 @@ class SpecificationValidationAgent(BaseSpecialistAgent):
         desc_text = (listing_obj.description or "").lower() if listing_obj else ""
         combined_text = f"{title_text} {desc_text}"
 
+        # Check against canonical product knowledge specs if available
+        cpk = state.get("canonical_product_knowledge")
+        if cpk and cpk.canonical_specs:
+            for spec_key, canonical_val in cpk.canonical_specs.items():
+                if spec_key in ("battery_capacity", "storage", "display_size"):
+                    canon_clean = str(canonical_val).lower().replace(" ", "")
+                    if (
+                        canon_clean
+                        and canon_clean not in combined_text
+                        and len(combined_text) > 20
+                    ):
+                        mismatch_msg = f"Specification mismatch: Canonical '{spec_key}' is '{canonical_val}'"
+                        if mismatch_msg not in result.inconsistent_specs:
+                            result.inconsistent_specs.append(mismatch_msg)
+                            result.risk_score = max(result.risk_score, 65)
+
         # Hard Rule checks
         if "bluetooth 9.0" in combined_text or "10000mah earbud" in combined_text:
             if "Impossible specification claim detected" not in result.impossible_specs:

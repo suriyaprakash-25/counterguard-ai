@@ -1,5 +1,5 @@
 import operator
-from typing import Annotated, Any, Dict, List, TypedDict
+from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
 from backend.collaboration.models.context import AgentWorkspace, InvestigationContext
 from backend.schemas.investigation import (
@@ -130,13 +130,19 @@ class InvestigationState(TypedDict, total=False):
     recommended_products: List[Dict[str, Any]]
 
     # -- SPRINT 17: REFERENCE DISCOVERY ARCHITECTURE FOUNDATION --
+    from backend.schemas.canonical_product import CanonicalProductKnowledge
     from backend.schemas.official_product import OfficialProductProfile
 
-    official_product_profile: OfficialProductProfile
+    verified_source: Optional[Dict[str, Any]]
+    official_product_profile: Optional[OfficialProductProfile]
+    canonical_product_knowledge: Optional[CanonicalProductKnowledge]
     reference_discovery_result: Dict[str, Any]
+    reference_discovery_metadata: Optional[Dict[str, Any]]
+    reference_extraction_metadata: Optional[Dict[str, Any]]
     reference_status: str
     reference_source: str
     reference_confidence: float
+    reference_evidence: List[Dict[str, Any]]
 
     # Legacy Outputs
     coordinator_result: AIInvestigationResult

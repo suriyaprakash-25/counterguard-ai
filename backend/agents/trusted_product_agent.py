@@ -40,11 +40,38 @@ class TrustedProductAgent:
             target_price = listing.price or target_price
 
         if state.get("analysis"):
-            brand_hint = state["analysis"].brand or brand_hint
+            brand_hint = getattr(state["analysis"], "brand", brand_hint)
             if target_price == 0:
-                target_price = state["analysis"].price or 0.0
+                target_price = getattr(state["analysis"], "price", 0.0)
 
         normalized = self.search_service.normalize_product(raw_title, brand_hint)
+
+        # Check if Reference Intelligence pipeline already provided CanonicalProductKnowledge
+        cpk = state.get("canonical_product_knowledge")
+        if cpk and getattr(cpk, "official_url", None):
+            logger.info(
+                f"TrustedProductAgent utilizing CanonicalProductKnowledge for '{cpk.product_name}'."
+            )
+            rec_item = {
+                "title": cpk.product_name,
+                "price": cpk.msrp or target_price,
+                "url": cpk.official_url,
+                "domain": cpk.brand,
+                "confidence": cpk.overall_confidence,
+                "verified": True,
+                "provenance": cpk.provenance_sources,
+            }
+            res = TrustedProductResult(
+                target_product=cpk.product_name,
+                brand=cpk.brand,
+                recommended_items=[rec_item],
+                explanation=f"Reference Intelligence verified canonical product knowledge from {cpk.official_url} with confidence {cpk.overall_confidence}.",
+                retrieval_status="success_reference_intelligence",
+            )
+            return {
+                "trusted_product_result": res,
+                "recommended_products": [rec_item],
+            }
 
         try:
             # Execute Real Retrieval across search providers

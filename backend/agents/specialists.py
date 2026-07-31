@@ -55,6 +55,12 @@ class BaseSpecialistAgent(BaseAgent):
 
         tool_data_for_prompt, state_updates = self._execute_tools(state)
 
+        # Inject CanonicalProductKnowledge into prompt data for read-only consumption
+        cpk = state.get("canonical_product_knowledge")
+        if cpk:
+            cpk_dict = cpk.model_dump() if hasattr(cpk, "model_dump") else cpk.__dict__
+            tool_data_for_prompt["canonical_product_knowledge"] = cpk_dict
+
         listing_data = (
             state.get("scraping_result").listing.model_dump(mode="json")
             if state.get("scraping_result") and state["scraping_result"].listing

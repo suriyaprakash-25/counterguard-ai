@@ -14,6 +14,8 @@ from backend.agents.intelligence_agents import (
     SpecificationValidationAgent,
 )
 from backend.agents.planner import PlanningAgent
+from backend.agents.reference_discovery_agent import reference_discovery_node
+from backend.agents.reference_extraction_agent import reference_extraction_node
 from backend.agents.reporter import ReportGenerator
 from backend.agents.specialists import BrandAgent, PriceAgent, ReviewAgent, SellerAgent
 from backend.agents.trusted_product_agent import TrustedProductAgent
@@ -167,6 +169,8 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_node("analyzer", node_analyze)
     graph.add_node("collector", node_evidence)
     graph.add_node("assessor", node_risk)
+    graph.add_node("reference_discovery", reference_discovery_node)
+    graph.add_node("reference_extraction", reference_extraction_node)
     graph.add_node("planner", planner_agent.run)
 
     graph.add_node("price_agent", price_agent.run)
@@ -189,7 +193,9 @@ def build_graph() -> StateGraph:  # noqa: C901
     graph.add_edge("scraper", "analyzer")
     graph.add_edge("analyzer", "collector")
     graph.add_edge("collector", "assessor")
-    graph.add_edge("assessor", "planner")
+    graph.add_edge("assessor", "reference_discovery")
+    graph.add_edge("reference_discovery", "reference_extraction")
+    graph.add_edge("reference_extraction", "planner")
 
     graph.add_conditional_edges("planner", route_to_specialists)
 

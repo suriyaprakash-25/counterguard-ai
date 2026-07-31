@@ -10,11 +10,26 @@ logger = logging.getLogger(__name__)
 
 class ExtractionNormalizationEngine:
     """
-    ExtractionNormalizationEngine (Sprint 17 Phase 3 Preparation)
-
-    Normalizes messy raw extracted strings (e.g. "Battery: 45 mAh", "Battery Size = 45 MAH", "Rs. 4,999")
-    into a single canonical `OfficialProductProfile` representation.
+    Production ExtractionNormalizationEngine.
+    Converts messy raw extracted strings (e.g. "Battery Size = 45 MAH", "Rs. 4,999")
+    into canonical normalized representations:
+      - Canonical specification keys (battery_capacity, display_size, storage, memory, weight, dimensions)
+      - Standardized units (mAh, GB, inches, grams)
+      - Parsed floating-point MSRP and ISO currency code (INR, USD, EUR)
     """
+
+    KEY_ALIASES: Dict[str, str] = {
+        "battery": "battery_capacity",
+        "battery_size": "battery_capacity",
+        "battery_capacity": "battery_capacity",
+        "screen_size": "display_size",
+        "display": "display_size",
+        "display_size": "display_size",
+        "internal_memory": "storage",
+        "ram_memory": "memory",
+        "ram": "memory",
+        "mass": "weight",
+    }
 
     @staticmethod
     def parse_price(price_str: Optional[str]) -> Tuple[Optional[float], str]:
@@ -24,28 +39,46 @@ class ExtractionNormalizationEngine:
         if not price_str:
             return None, "INR"
 
+        p_upper = price_str.upper()
         currency = (
             "USD"
-            if "$" in price_str
-            else ("INR" if "rs" in price_str.lower() or "₹" in price_str else "INR")
+            if "$" in price_str or "USD" in p_upper
+            else (
+                "EUR"
+                if "€" in price_str or "EUR" in p_upper
+                else ("GBP" if "£" in price_str or "GBP" in p_upper else "INR")
+            )
         )
         clean = price_str.replace(",", "")
         match = re.search(r"\d+(?:\.\d+)?", clean)
         val = float(match.group(0)) if match else None
         return val, currency
 
+    def normalize_unit(self, val_str: str) -> str:
+        """Standardizes unit strings."""
+        val = str(val_str).strip()
+        # Battery mAh
+        val = re.sub(r"(\d+)\s*mah\b", r"\1 mAh", val, flags=re.I)
+        # Storage GB/TB
+        val = re.sub(r"(\d+)\s*gb\b", r"\1 GB", val, flags=re.I)
+        val = re.sub(r"(\d+)\s*tb\b", r"\1 TB", val, flags=re.I)
+        # Weight grams/kg
+        val = re.sub(r"(\d+)\s*g\b", r"\1 grams", val, flags=re.I)
+        val = re.sub(r"(\d+)\s*kg\b", r"\1 kg", val, flags=re.I)
+        return val
+
     def normalize_specifications(self, raw_specs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Normalizes specification keys and values into canonical lower-snake-case dictionaries.
-        E.g., "Battery Capacity" -> "battery_capacity": "45 mAh"
+        Normalizes specification keys into canonical snake_case representations and formats units.
         """
         normalized: Dict[str, Any] = {}
         for key, val in raw_specs.items():
-            clean_key = (
+            raw_k_clean = (
                 re.sub(r"[^\w\s]", "", str(key)).strip().lower().replace(" ", "_")
             )
-            val_str = str(val).strip() if val is not None else ""
-            normalized[clean_key] = val_str
+            canonical_k = self.KEY_ALIASES.get(raw_k_clean, raw_k_clean)
+            val_norm = self.normalize_unit(str(val)) if val is not None else ""
+            normalized[canonical_k] = val_norm
         return normalized
 
     def normalize(self, raw: RawExtractionResult) -> OfficialProductProfile:

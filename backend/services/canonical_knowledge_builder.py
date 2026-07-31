@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class CanonicalKnowledgeBuilder:
     """
-    CanonicalKnowledgeBuilder (Sprint 17 Foundation Component)
+    Production CanonicalKnowledgeBuilder (Sprint 17 Phase 3 Implementation)
 
     Transforms extracted OfficialProductProfile baselines and auxiliary multi-source catalogs
     (FCC DB, BIS DB, GSMArena, retail catalogs) into a single, source-agnostic `CanonicalProductKnowledge`
@@ -45,6 +45,9 @@ class CanonicalKnowledgeBuilder:
                 if src_name not in provenance:
                     provenance.append(src_name)
 
+        quality_score = profile.metadata.get("quality_score", profile.confidence)
+        fused_confidence = round((profile.confidence + quality_score) / 2.0, 2)
+
         return CanonicalProductKnowledge(
             brand=profile.brand,
             product_name=profile.product_name,
@@ -62,7 +65,7 @@ class CanonicalKnowledgeBuilder:
                 "certifications", ["CE", "BIS", "RoHS"]
             ),
             warranty_terms=profile.warranty,
-            overall_confidence=profile.confidence,
+            overall_confidence=fused_confidence,
             provenance_sources=provenance,
             evidence_trail=profile.evidence_trail,
             metadata=profile.metadata,

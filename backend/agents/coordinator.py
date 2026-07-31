@@ -58,6 +58,23 @@ class CoordinatorAgent:
             "graphrag_context": context.graphrag_context,
         }
 
+        # 5. Cross-Agent Evidence Correlation with Canonical Product Knowledge
+        cpk = state.get("canonical_product_knowledge")
+        canonical_ref_summary = (
+            f"Canonical Knowledge Baseline: '{cpk.product_name}' by '{cpk.brand}' (MSRP: ₹{cpk.msrp})"
+            if cpk
+            else "Legacy Search Baseline"
+        )
+
+        # Categorize Strongest vs Weakest Evidence
+        sorted_ev = sorted(
+            context.shared_evidence, key=lambda e: e.confidence, reverse=True
+        )
+        strongest_ev = (
+            sorted_ev[0].description if sorted_ev else "No direct evidence collected"
+        )
+        weakest_ev = sorted_ev[-1].description if sorted_ev else "None"
+
         user_prompt = build_coordinator_user_prompt(formatted_results)
 
         try:
@@ -78,7 +95,7 @@ class CoordinatorAgent:
             return {
                 "coordinator_result": result,
                 "context": context,
-                "explanation": explanation,
+                "explanation": f"{explanation}\n\n{canonical_ref_summary}\nStrongest Evidence: {strongest_ev}\nWeakest Evidence: {weakest_ev}",
             }
         except LLMServiceError as e:
             logger.error(f"[CoordinatorAgent] LLM Service error: {e}")

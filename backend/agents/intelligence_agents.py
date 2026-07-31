@@ -175,13 +175,16 @@ class SpecificationValidationAgent(BaseSpecialistAgent):
         new_context = InvestigationContext(investigation_id="temp")
 
         # Deterministic check for impossible/contradictory spec flags
-        listing_obj = (
-            state.get("scraping_result").listing
-            if state.get("scraping_result")
-            else None
+        sr = state.get("scraping_result")
+        listing_obj = getattr(sr, "listing", None) if sr else None
+        title_text = (
+            (getattr(listing_obj, "title", "") or "").lower() if listing_obj else ""
         )
-        title_text = (listing_obj.title or "").lower() if listing_obj else ""
-        desc_text = (listing_obj.description or "").lower() if listing_obj else ""
+        desc_text = (
+            (getattr(listing_obj, "description", "") or "").lower()
+            if listing_obj
+            else ""
+        )
         combined_text = f"{title_text} {desc_text}"
 
         # Check against canonical product knowledge specs if available

@@ -171,6 +171,39 @@ class PriceAgent(BaseSpecialistAgent):
             else []
         )
 
+        sr = state.get("scraping_result")
+        listing_obj = getattr(sr, "listing", None) if sr else None
+        mkt_price = (
+            float(getattr(listing_obj, "price", 0.0))
+            if listing_obj and getattr(listing_obj, "price", None)
+            else 0.0
+        )
+
+        cpk = state.get("canonical_product_knowledge")
+        canonical_msrp = cpk.msrp if cpk and cpk.msrp else 0.0
+
+        price_diff_pct = 0.0
+        discount_class = "market_normal"
+        grey_market = False
+
+        if canonical_msrp > 0 and mkt_price > 0:
+            price_diff_pct = round(
+                ((canonical_msrp - mkt_price) / canonical_msrp) * 100.0, 1
+            )
+            if price_diff_pct >= 70.0:
+                discount_class = "extreme_discount"
+                result.risk_score = max(result.risk_score, 90)
+                result.reasoning += f" Extreme price anomaly: Marketplace price ₹{mkt_price} is {price_diff_pct}% below canonical MSRP (₹{canonical_msrp}). High counterfeit probability."
+            elif price_diff_pct >= 45.0:
+                discount_class = "suspicious_discount"
+                result.risk_score = max(result.risk_score, 75)
+                result.reasoning += f" Suspicious discount: Marketplace price ₹{mkt_price} is {price_diff_pct}% below canonical MSRP (₹{canonical_msrp})."
+            elif price_diff_pct >= 25.0:
+                discount_class = "grey_market"
+                grey_market = True
+                result.risk_score = max(result.risk_score, 45)
+                result.reasoning += f" Potential grey market listing: Price is {price_diff_pct}% below canonical MSRP."
+
         sev = (
             "critical"
             if result.risk_score > 75
@@ -192,7 +225,13 @@ class PriceAgent(BaseSpecialistAgent):
             derived_from=prior_ev_ids,
             metadata={
                 "risk_score": result.risk_score,
-                "anomaly_detected": getattr(result, "anomaly_detected", False),
+                "anomaly_detected": getattr(result, "anomaly_detected", False)
+                or (price_diff_pct >= 45.0),
+                "price_difference_percentage": price_diff_pct,
+                "canonical_msrp": canonical_msrp,
+                "marketplace_price": mkt_price,
+                "discount_classification": discount_class,
+                "grey_market_indicators": grey_market,
             },
         )
         new_context.add_evidence(ev, derived_from_ids=prior_ev_ids)
@@ -358,6 +397,26 @@ class BrandAgent(BaseSpecialistAgent):
         self, state: InvestigationState, result: BrandAnalysisResult
     ) -> dict:
         new_context = InvestigationContext(investigation_id="temp")
+
+        sr = state.get("scraping_result")
+        listing_obj = getattr(sr, "listing", None) if sr else None
+        mkt_brand = (
+            (getattr(listing_obj, "brand", "") or "").strip() if listing_obj else ""
+        )
+
+        cpk = state.get("canonical_product_knowledge")
+        canonical_brand = cpk.brand if cpk else ""
+
+        brand_mismatch = False
+        if canonical_brand and mkt_brand:
+            if (
+                canonical_brand.lower() not in mkt_brand.lower()
+                and mkt_brand.lower() not in canonical_brand.lower()
+            ):
+                brand_mismatch = True
+                result.risk_score = max(result.risk_score, 85)
+                result.reasoning += f" Brand mismatch: Marketplace lists '{mkt_brand}' but canonical reference brand is '{canonical_brand}'."
+
         sev = (
             "critical"
             if result.risk_score > 75
@@ -379,6 +438,8 @@ class BrandAgent(BaseSpecialistAgent):
             metadata={
                 "risk_score": result.risk_score,
                 "authenticity_flags": getattr(result, "authenticity_flags", []),
+                "brand_mismatch": brand_mismatch,
+                "canonical_brand": canonical_brand,
             },
         )
         new_context.add_evidence(ev)

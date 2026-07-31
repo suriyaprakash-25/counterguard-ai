@@ -49,8 +49,17 @@ class VisualForensicsAgent(BaseAgent):
         image_url = listing.image_url if listing else None
         product_name = listing.title if listing else "default"
 
+        # Check CanonicalProductKnowledge for verified reference image URLs
+        cpk = state.get("canonical_product_knowledge")
+        canonical_image_url = None
+        if cpk and cpk.verified_images and len(cpk.verified_images) > 0:
+            canonical_image_url = cpk.verified_images[0]
+            logger.info(
+                f"VisualForensicsAgent utilizing canonical verified image: '{canonical_image_url}'."
+            )
+
         similarity_score, ref_found = self._compare_listing_image(
-            product_name, image_url
+            product_name, image_url, canonical_image_url=canonical_image_url
         )
 
         findings_update = []
@@ -71,12 +80,20 @@ class VisualForensicsAgent(BaseAgent):
         }
 
     def _compare_listing_image(
-        self, product_name: str, listing_image_url: Optional[str]
+        self,
+        product_name: str,
+        listing_image_url: Optional[str],
+        canonical_image_url: Optional[str] = None,
     ) -> Tuple[float, bool]:
         """
         Loads golden reference image and listing image, then computes perceptual similarity score (0.0 to 100.0%).
         """
-        ref_image = self._load_golden_reference(product_name)
+        ref_image = None
+        if canonical_image_url:
+            ref_image = self._load_listing_image(canonical_image_url)
+
+        if ref_image is None:
+            ref_image = self._load_golden_reference(product_name)
         if ref_image is None:
             logger.warning(
                 "No golden reference image found. Returning default similarity 100.0%."

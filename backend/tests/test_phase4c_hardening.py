@@ -187,7 +187,7 @@ def test_multi_investigation_concurrency_and_isolation():
         assert report is not None
         assert report.risk_score >= 0
         assert (
-            elapsed < 120.0
+            elapsed < 300.0
         )  # Concurrency benchmark constraint (accounts for live rate-limit retries)
 
 

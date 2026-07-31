@@ -114,5 +114,32 @@ class ReferenceDiscoveryAgent:
 
 def reference_discovery_node(state: InvestigationState) -> Dict[str, Any]:
     """LangGraph node wrapper for ReferenceDiscoveryAgent."""
+    from backend.telemetry.observability import get_current_memory_mb
+
+    start_t = time.perf_counter()
+    start_mem = get_current_memory_mb()
+    corr_id = state.get("correlation_id") or "corr_default"
+
     agent = ReferenceDiscoveryAgent()
-    return agent.run(state)
+    out = agent.run(state)
+
+    duration_ms = round((time.perf_counter() - start_t) * 1000.0, 2)
+    end_mem = get_current_memory_mb()
+
+    timeline_entry = {
+        "node": "reference_discovery",
+        "correlation_id": corr_id,
+        "start_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "finish_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "duration_ms": duration_ms,
+        "memory_mb": end_mem,
+        "memory_delta_mb": round(end_mem - start_mem, 2),
+        "status": "success"
+        if out.get("reference_status") == "discovered"
+        else "fallback",
+        "retry_count": 0,
+        "fallback_used": out.get("reference_status") == "fallback_legacy",
+    }
+
+    out["investigation_timeline"] = [timeline_entry]
+    return out

@@ -19,9 +19,19 @@ class InvestigationService:
         """
         Executes the LangGraph multi-agent investigation workflow.
         """
-        logger.info(f"Starting InvestigationService for {request.listing_url}")
+        import uuid
 
-        initial_state: InvestigationState = {"request": request}
+        corr_id = f"corr-{uuid.uuid4().hex[:8]}"
+        logger.info(
+            f"Starting InvestigationService [{corr_id}] for {request.listing_url}"
+        )
+
+        initial_state: InvestigationState = {
+            "request": request,
+            "correlation_id": corr_id,
+            "investigation_timeline": [],
+            "execution_telemetry": {},
+        }
 
         try:
             # Search organizational memory precedents before final report generation

@@ -112,5 +112,31 @@ class ReferenceExtractionAgent:
 
 def reference_extraction_node(state: InvestigationState) -> Dict[str, Any]:
     """LangGraph node wrapper for ReferenceExtractionAgent."""
+    import time
+
+    from backend.telemetry.observability import get_current_memory_mb
+
+    start_t = time.perf_counter()
+    corr_id = state.get("correlation_id") or "corr_default"
+
     agent = ReferenceExtractionAgent()
-    return agent.run(state)
+    out = agent.run(state)
+
+    duration_ms = round((time.perf_counter() - start_t) * 1000.0, 2)
+    end_mem = get_current_memory_mb()
+
+    is_success = out.get("canonical_product_knowledge") is not None
+    timeline_entry = {
+        "node": "reference_extraction",
+        "correlation_id": corr_id,
+        "start_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "finish_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "duration_ms": duration_ms,
+        "memory_mb": end_mem,
+        "status": "success" if is_success else "fallback",
+        "retry_count": 0,
+        "fallback_used": not is_success,
+    }
+
+    out["investigation_timeline"] = [timeline_entry]
+    return out

@@ -144,6 +144,11 @@ class InvestigationState(TypedDict, total=False):
     reference_confidence: float
     reference_evidence: List[Dict[str, Any]]
 
+    # -- SPRINT 17 PHASE 4C: TELEMETRY & TIMELINE --
+    correlation_id: str
+    investigation_timeline: Annotated[List[Dict[str, Any]], operator.add]
+    execution_telemetry: Dict[str, Any]
+
     # Legacy Outputs
     coordinator_result: AIInvestigationResult
     report: InvestigationReport

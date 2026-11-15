@@ -27,8 +27,6 @@ share/python-wheels/
 MANIFEST
 
 # Environment variables
-.env
-.env.local
 
 # Pytest
 .pytest_cache/
@@ -42,7 +40,6 @@ dist/
 
 # IDE / OS
 .idea/
-.vscode/
 *.swp
 *.swo
 .DS_Store
@@ -58,3 +55,4 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+config.bat
